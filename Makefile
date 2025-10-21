@@ -78,10 +78,10 @@ my-app: # CLI without any arguments, utilizing uv script entrypoint
 # Docker
 ####################################
 docker-build: # Build local image for testing
-	docker build --platform $(CPU_ARCH) -t python-cli-template:latest .
+	docker build --platform $(CPU_ARCH) -t timdex-embeddings:latest .
 
 docker-shell: # Shell into local container for testing
-	docker run -it --entrypoint='bash' python-cli-template:latest
+	docker run -it --entrypoint='bash' timdex-embeddings:latest
 
 docker-run: # Run main entrypoint + command without arguments
-	docker run python-cli-template:latest
+	docker run timdex-embeddings:latest
