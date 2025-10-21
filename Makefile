@@ -34,7 +34,7 @@ update: # Update Python dependencies
 ######################
 
 test: # Run tests and print a coverage report
-	uv run coverage run --source=my_app -m pytest -vv
+	uv run coverage run --source=embeddings -m pytest -vv
 	uv run coverage report -m
 
 coveralls: test # Write coverage data to an LCOV report

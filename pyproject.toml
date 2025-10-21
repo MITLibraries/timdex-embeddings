@@ -85,7 +85,7 @@ max-doc-length = 90
 convention = "google"
 
 [project.scripts]
-my-app = "my_app.cli:main"
+embeddings = "embeddings.cli:main"
 
 [build-system]
 requires = ["setuptools>=61"]
