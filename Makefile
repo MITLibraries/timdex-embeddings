@@ -1,5 +1,6 @@
 SHELL=/bin/bash
 DATETIME:=$(shell date -u +%Y%m%dT%H%M%SZ)
+CPU_ARCH ?= $(shell cat .aws-architecture 2>/dev/null || echo "linux/amd64")
 
 help: # Preview Makefile commands
 	@awk 'BEGIN { FS = ":.*#"; print "Usage:  make <target>\n\nTargets:" } \
@@ -77,7 +78,7 @@ my-app: # CLI without any arguments, utilizing uv script entrypoint
 # Docker
 ####################################
 docker-build: # Build local image for testing
-	docker build -t python-cli-template:latest .
+	docker build --platform $(CPU_ARCH) -t python-cli-template:latest .
 
 docker-shell: # Shell into local container for testing
 	docker run -it --entrypoint='bash' python-cli-template:latest
