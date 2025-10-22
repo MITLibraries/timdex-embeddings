@@ -62,26 +62,17 @@ def ping() -> None:
 )
 def download_model(model_uri: str, output: Path) -> None:
     """Download a model from HuggingFace and save as zip file."""
-    try:
-        model_class = get_model_class(model_uri)
-    except ValueError as e:
-        logger.exception("Unknown model URI: %s", model_uri)
-        raise click.ClickException(str(e)) from e
-
-    logger.info("Downloading model: %s", model_uri)
+    # load embedding model class
+    model_class = get_model_class(model_uri)
     model = model_class(model_uri)
 
-    try:
-        result_path = model.download(output)
-        logger.info("Model downloaded successfully to: %s", result_path)
-        click.echo(f"Model saved to: {result_path}")
-    except NotImplementedError as e:
-        logger.exception("Download not yet implemented for model: %s", model_uri)
-        raise click.ClickException(str(e)) from e
-    except Exception as e:
-        logger.exception("Failed to download model: %s", model_uri)
-        msg = f"Download failed: {e}"
-        raise click.ClickException(msg) from e
+    # download model assets
+    logger.info(f"Downloading model: {model_uri}")
+    result_path = model.download(output)
+
+    message = f"Model downloaded and saved to: {result_path}"
+    logger.info(message)
+    click.echo(result_path)
 
 
 @main.command()
@@ -90,9 +81,8 @@ def download_model(model_uri: str, output: Path) -> None:
     required=True,
     help="HuggingFace model URI (e.g., 'org/model-name')",
 )
-def create_embeddings(model_uri: str) -> None:
-    """Create embeddings."""
-    logger.info("create-embeddings command called with model: %s", model_uri)
+def create_embeddings(_model_uri: str) -> None:
+    # TODO: docstring # noqa: FIX002
     raise NotImplementedError
 
 

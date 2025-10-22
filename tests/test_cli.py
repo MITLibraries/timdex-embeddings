@@ -16,12 +16,12 @@ def test_cli_debug_logging(caplog, runner):
     assert "pong" in result.output
 
 
-def test_download_model_unknown_uri(runner):
+def test_download_model_unknown_uri(caplog, runner):
     result = runner.invoke(
         main, ["download-model", "--model-uri", "unknown/model", "--output", "out.zip"]
     )
     assert result.exit_code != 0
-    assert "Unknown model URI" in result.output
+    assert "Unknown model URI" in caplog.text
 
 
 def test_download_model_not_implemented(caplog, runner):
