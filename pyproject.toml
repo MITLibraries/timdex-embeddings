@@ -3,8 +3,8 @@
 # https://mitlibraries.atlassian.net/wiki/spaces/IN/pages/3432415247/Python+Project+Linters#Template-for-pyproject.toml
 
 [project]
-name = "python-cli-template"
-version = "2.0.0"
+name = "timdex-embeddings"
+version = "1.0.0"
 requires-python = ">=3.12"
 
 dependencies = [
@@ -85,7 +85,7 @@ max-doc-length = 90
 convention = "google"
 
 [project.scripts]
-my-app = "my_app.cli:main"
+embeddings = "embeddings.cli:main"
 
 [build-system]
 requires = ["setuptools>=61"]

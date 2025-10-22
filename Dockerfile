@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.12-slim
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git ca-certificates && \
@@ -13,9 +13,9 @@ WORKDIR /app
 COPY pyproject.toml uv.lock* ./
 
 # Copy CLI application
-COPY my_app ./my_app
+COPY embeddings ./embeddings
 
 # Install package into system python, includes "marimo-launcher" script
 RUN uv pip install --system .
 
-ENTRYPOINT ["my-app"]
+ENTRYPOINT ["embeddings"]

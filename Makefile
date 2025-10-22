@@ -1,5 +1,6 @@
 SHELL=/bin/bash
 DATETIME:=$(shell date -u +%Y%m%dT%H%M%SZ)
+CPU_ARCH ?= $(shell cat .aws-architecture 2>/dev/null || echo "linux/amd64")
 
 help: # Preview Makefile commands
 	@awk 'BEGIN { FS = ":.*#"; print "Usage:  make <target>\n\nTargets:" } \
@@ -34,7 +35,7 @@ update: # Update Python dependencies
 ######################
 
 test: # Run tests and print a coverage report
-	uv run coverage run --source=my_app -m pytest -vv
+	uv run coverage run --source=embeddings -m pytest -vv
 	uv run coverage report -m
 
 coveralls: test # Write coverage data to an LCOV report
@@ -77,10 +78,10 @@ my-app: # CLI without any arguments, utilizing uv script entrypoint
 # Docker
 ####################################
 docker-build: # Build local image for testing
-	docker build -t python-cli-template:latest .
+	docker build --platform $(CPU_ARCH) -t timdex-embeddings:latest .
 
 docker-shell: # Shell into local container for testing
-	docker run -it --entrypoint='bash' python-cli-template:latest
+	docker run -it --entrypoint='bash' timdex-embeddings:latest
 
 docker-run: # Run main entrypoint + command without arguments
-	docker run python-cli-template:latest
+	docker run timdex-embeddings:latest
