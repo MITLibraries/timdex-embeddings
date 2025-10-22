@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.1",
     "sentry-sdk>=2.34.1",
+    "timdex-dataset-api",
 ]
 
 [dependency-groups]
@@ -83,6 +84,9 @@ max-doc-length = 90
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.uv.sources]
+timdex-dataset-api = { git = "https://github.com/MITLibraries/timdex-dataset-api" }
 
 [project.scripts]
 embeddings = "embeddings.cli:main"
