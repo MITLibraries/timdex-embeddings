@@ -9,7 +9,9 @@ requires-python = ">=3.12"
 
 dependencies = [
     "click>=8.2.1",
+    "huggingface-hub>=0.26.0",
     "sentry-sdk>=2.34.1",
+    "timdex-dataset-api",
 ]
 
 [dependency-groups]
@@ -55,11 +57,14 @@ ignore = [
     "D101", 
     "D102",
     "D103",
-    "D104", 
+    "D104",
+    "G004",
     "PLR0912",
     "PLR0913", 
     "PLR0915",
     "S321",
+    "TD002",
+    "TD003",
 ]
 
 # allow autofix behavior for specified rules
@@ -83,6 +88,9 @@ max-doc-length = 90
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.uv.sources]
+timdex-dataset-api = { git = "https://github.com/MITLibraries/timdex-dataset-api" }
 
 [project.scripts]
 embeddings = "embeddings.cli:main"
