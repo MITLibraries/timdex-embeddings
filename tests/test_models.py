@@ -2,6 +2,7 @@ import zipfile
 
 import pytest
 
+from embeddings.models.base import BaseEmbeddingModel
 from embeddings.models.registry import MODEL_REGISTRY, get_model_class
 
 
@@ -46,3 +47,17 @@ def test_get_model_class_returns_correct_class():
 def test_get_model_class_raises_for_unknown_uri():
     with pytest.raises(ValueError, match="Unknown model URI"):
         get_model_class("unknown/model-uri")
+
+
+def test_subclass_without_model_uri_raises_type_error():
+    with pytest.raises(TypeError, match="must define 'MODEL_URI' class attribute"):
+
+        class InvalidModel(BaseEmbeddingModel):
+            pass
+
+
+def test_subclass_with_non_string_model_uri_raises_type_error():
+    with pytest.raises(TypeError, match="must override 'MODEL_URI' with a valid string"):
+
+        class InvalidModel(BaseEmbeddingModel):
+            MODEL_URI = 123
