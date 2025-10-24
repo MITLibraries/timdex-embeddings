@@ -7,12 +7,25 @@ from pathlib import Path
 class BaseEmbeddingModel(ABC):
     """Abstract base class for embedding models.
 
-    Args:
-        model_uri: HuggingFace model identifier (e.g., 'org/model-name').
+    All child classes must set class level attribute MODEL_URI.
     """
 
-    def __init__(self, model_uri: str) -> None:
-        self.model_uri = model_uri
+    MODEL_URI: str  # Type hint to document the requirement
+
+    def __init_subclass__(cls, **kwargs: dict) -> None:  # noqa: D105
+        super().__init_subclass__(**kwargs)
+
+        # require class level MODEL_URI to be set
+        if not hasattr(cls, "MODEL_URI"):
+            msg = f"{cls.__name__} must define 'MODEL_URI' class attribute"
+            raise TypeError(msg)
+        if not isinstance(cls.MODEL_URI, str):
+            msg = f"{cls.__name__} must override 'MODEL_URI' with a valid string"
+            raise TypeError(msg)
+
+    @property
+    def model_uri(self) -> str:
+        return self.MODEL_URI
 
     @abstractmethod
     def download(self, output_path: Path) -> Path:
