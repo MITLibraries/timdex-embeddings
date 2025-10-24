@@ -14,6 +14,8 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
     HuggingFace URI: opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte
     """
 
+    MODEL_URI = "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte"
+
     def download(self, output_path: Path) -> Path:
         """Download and prepare model, saving to output_path.
 

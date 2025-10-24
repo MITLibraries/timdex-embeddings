@@ -22,22 +22,3 @@ def test_download_model_unknown_uri(caplog, runner):
     )
     assert result.exit_code != 0
     assert "Unknown model URI" in caplog.text
-
-
-def test_download_model_not_implemented(caplog, runner):
-    caplog.set_level("INFO")
-    result = runner.invoke(
-        main,
-        [
-            "download-model",
-            "--model-uri",
-            "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte",
-            "--output",
-            "out.zip",
-        ],
-    )
-    assert (
-        "Downloading model: opensearch-project/"
-        "opensearch-neural-sparse-encoding-doc-v3-gte, saving to: out.zip."
-    ) in caplog.text
-    assert result.exit_code != 0

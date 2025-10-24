@@ -1,5 +1,7 @@
+import functools
 import logging
 import time
+from collections.abc import Callable
 from datetime import timedelta
 from pathlib import Path
 
@@ -9,6 +11,22 @@ from embeddings.config import configure_logger, configure_sentry
 from embeddings.models.registry import get_model_class
 
 logger = logging.getLogger(__name__)
+
+
+def model_required(f: Callable) -> Callable:
+    """Decorator for commands that require a specific model."""
+
+    @click.option(
+        "--model-uri",
+        envvar="TE_MODEL_URI",
+        required=True,
+        help="HuggingFace model URI (e.g., 'org/model-name')",
+    )
+    @functools.wraps(f)
+    def wrapper(*args: list, **kwargs: dict) -> Callable:
+        return f(*args, **kwargs)
+
+    return wrapper
 
 
 @click.group("embeddings")
@@ -49,14 +67,11 @@ def ping() -> None:
 
 
 @main.command()
-@click.option(
-    "--model-uri",
-    required=True,
-    help="HuggingFace model URI (e.g., 'org/model-name')",
-)
+@model_required
 @click.option(
     "--output",
     required=True,
+    envvar="TE_MODEL_DOWNLOAD_PATH",
     type=click.Path(path_type=Path),
     help="Output path for zipped model (e.g., '/path/to/model.zip')",
 )
@@ -64,7 +79,7 @@ def download_model(model_uri: str, output: Path) -> None:
     """Download a model from HuggingFace and save as zip file."""
     # load embedding model class
     model_class = get_model_class(model_uri)
-    model = model_class(model_uri)
+    model = model_class()
 
     # download model assets
     logger.info(f"Downloading model: {model_uri}")
@@ -76,11 +91,7 @@ def download_model(model_uri: str, output: Path) -> None:
 
 
 @main.command()
-@click.option(
-    "--model-uri",
-    required=True,
-    help="HuggingFace model URI (e.g., 'org/model-name')",
-)
+@model_required
 def create_embeddings(_model_uri: str) -> None:
     # TODO: docstring # noqa: FIX002
     raise NotImplementedError
