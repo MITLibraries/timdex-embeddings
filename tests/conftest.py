@@ -21,6 +21,8 @@ def runner():
 class MockEmbeddingModel(BaseEmbeddingModel):
     """Simple test model that doesn't hit external APIs."""
 
+    MODEL_URI = "test/mock-model"
+
     def download(self, output_path: Path) -> Path:
         """Create a fake model zip file for testing."""
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -34,4 +36,4 @@ class MockEmbeddingModel(BaseEmbeddingModel):
 @pytest.fixture
 def mock_model():
     """Fixture providing a MockEmbeddingModel instance."""
-    return MockEmbeddingModel("test/mock-model")
+    return MockEmbeddingModel()

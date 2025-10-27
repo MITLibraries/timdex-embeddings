@@ -18,6 +18,7 @@ dependencies = [
 dev = [
     "black>=25.1.0",
     "coveralls>=4.0.1",
+    "ipython>=9.6.0",
     "mypy>=1.17.1",
     "pip-audit>=2.9.0",
     "pre-commit>=4.3.0",
@@ -58,6 +59,7 @@ ignore = [
     "D102",
     "D103",
     "D104",
+    "EM102",
     "G004",
     "PLR0912",
     "PLR0913", 
@@ -65,6 +67,7 @@ ignore = [
     "S321",
     "TD002",
     "TD003",
+    "TRY003",
 ]
 
 # allow autofix behavior for specified rules
