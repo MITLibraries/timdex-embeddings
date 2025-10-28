@@ -28,6 +28,20 @@ TE_MODEL_DOWNLOAD_PATH=# Download location for model
 HF_HUB_DISABLE_PROGRESS_BARS=#boolean to use progress bars for HuggingFace model downloads; defaults to 'true' in deployed contexts
 ```
 
+## Configuring an Embedding Model
+
+This CLI application is designed to create embeddings for input texts.  To do this, a pre-trained model must be identified and configured for use.  
+
+To this end, there is a base embedding class `BaseEmbeddingModel` that is designed to be extended and customized for a particular embedding model.
+
+Once an embedding class has been created, the preferred approach is to set env vars `TE_MODEL_URI` and `TE_MODEL_DOWNLOAD_PATH` directly in the `Dockerfile` to a) download a local snapshot of the model during image build, and b) set this model as the default for the CLI.
+
+This allows invoking the CLI without specifying a model URI or local location, allowing this model to serve as the default, e.g.:
+
+```shell
+uv run --env-file .env embeddings test-model-load
+```
+
 ## CLI Commands
 
 For local development, all CLI commands should be invoked with the following format to pickup environment variables from `.env`:

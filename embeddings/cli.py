@@ -1,5 +1,6 @@
 import functools
 import logging
+import os
 import time
 from collections.abc import Callable
 from datetime import timedelta
@@ -88,6 +89,25 @@ def download_model(model_uri: str, output: Path) -> None:
     message = f"Model downloaded and saved to: {result_path}"
     logger.info(message)
     click.echo(result_path)
+
+
+@main.command()
+def test_model_load() -> None:
+    """Test loading of embedding class and local model based on env vars.
+
+    In a deployed context, the following env vars are expected:
+        - TE_MODEL_URI
+        - TE_MODEL_DOWNLOAD_PATH
+
+    With these set, the embedding class should be registered successfully and initialized,
+    and the model loaded from a local copy.
+    """
+    # load embedding model class
+    model_class = get_model_class(os.environ["TE_MODEL_URI"])
+    model = model_class()
+
+    model.load(os.environ["TE_MODEL_DOWNLOAD_PATH"])
+    click.echo("OK")
 
 
 @main.command()

@@ -18,4 +18,13 @@ COPY embeddings ./embeddings
 # Install package into system python, includes "marimo-launcher" script
 RUN uv pip install --system .
 
-ENTRYPOINT ["embeddings"]
+# Download the model and include in the Docker image
+# NOTE: The env vars "TE_MODEL_URI" and "TE_MODEL_DOWNLOAD_PATH" are set here to support
+#  the downloading of the model into this image build, but persist in the container and
+#  effectively also set this as the default model.
+ENV HF_HUB_DISABLE_PROGRESS_BARS=true
+ENV TE_MODEL_URI=opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte
+ENV TE_MODEL_DOWNLOAD_PATH=/model
+RUN python -m embeddings.cli --verbose download-model
+
+ENTRYPOINT ["python", "-m", "embeddings.cli"]
