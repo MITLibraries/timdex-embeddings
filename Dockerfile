@@ -15,7 +15,7 @@ COPY pyproject.toml uv.lock* ./
 # Copy CLI application
 COPY embeddings ./embeddings
 
-# Install package into system python, includes "marimo-launcher" script
+# Install package into system python
 RUN uv pip install --system .
 
 # Download the model and include in the Docker image
