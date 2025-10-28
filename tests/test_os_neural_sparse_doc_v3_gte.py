@@ -10,18 +10,18 @@ import pytest
 from embeddings.models.os_neural_sparse_doc_v3_gte import OSNeuralSparseDocV3GTE
 
 
-def test_init():
+def test_init(tmp_path):
     """Test model initialization."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
     assert model._model is None
     assert model._tokenizer is None
     assert model._special_token_ids is None
     assert model._id_to_token is None
 
 
-def test_model_uri():
+def test_model_uri(tmp_path):
     """Test model_uri property returns correct HuggingFace URI."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
     assert (
         model.model_uri
         == "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte"
@@ -36,10 +36,10 @@ def test_download_to_directory(
     neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path
 ):
     """Test download to directory (not zip)."""
-    model = OSNeuralSparseDocV3GTE()
     output_path = tmp_path / "model_output"
+    model = OSNeuralSparseDocV3GTE(output_path)
 
-    result = model.download(output_path)
+    result = model.download()
 
     assert result == output_path
     assert output_path.exists()
@@ -52,10 +52,10 @@ def test_download_to_zip_file(
     neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path
 ):
     """Test download creates zip when path ends in .zip."""
-    model = OSNeuralSparseDocV3GTE()
     output_path = tmp_path / "model.zip"
+    model = OSNeuralSparseDocV3GTE(output_path)
 
-    result = model.download(output_path)
+    result = model.download()
 
     assert result == output_path
     assert output_path.exists()
@@ -66,8 +66,8 @@ def test_download_calls_patch_method(
     neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path, monkeypatch
 ):
     """Test that download calls the Alibaba patching method."""
-    model = OSNeuralSparseDocV3GTE()
     output_path = tmp_path / "model_output"
+    model = OSNeuralSparseDocV3GTE(output_path)
 
     patch_called = False
 
@@ -77,7 +77,7 @@ def test_download_calls_patch_method(
 
     monkeypatch.setattr(model, "_patch_local_model_with_alibaba_new_impl", mock_patch)
 
-    model.download(output_path)
+    model.download()
 
     assert patch_called
 
@@ -86,10 +86,10 @@ def test_download_returns_path(
     neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path
 ):
     """Test download returns the output path."""
-    model = OSNeuralSparseDocV3GTE()
     output_path = tmp_path / "model_output"
+    model = OSNeuralSparseDocV3GTE(output_path)
 
-    result = model.download(output_path)
+    result = model.download()
 
     assert result == output_path
     assert isinstance(result, Path)
@@ -99,7 +99,7 @@ def test_patch_downloads_alibaba_model(
     neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path
 ):
     """Test patch method downloads Alibaba-NLP/new-impl."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
     model_temp_path = tmp_path / "temp_model"
     model_temp_path.mkdir()
     (model_temp_path / "config.json").write_text('{"model_type": "test"}')
@@ -112,7 +112,7 @@ def test_patch_downloads_alibaba_model(
 
 def test_patch_copies_files(neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path):
     """Test patch copies modeling.py and configuration.py."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
     model_temp_path = tmp_path / "temp_model"
     model_temp_path.mkdir()
     (model_temp_path / "config.json").write_text('{"model_type": "test"}')
@@ -130,7 +130,7 @@ def test_patch_updates_config_json(
     neural_sparse_doc_v3_gte_mock_huggingface_snapshot, tmp_path
 ):
     """Test patch updates auto_map in config.json."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
     model_temp_path = tmp_path / "temp_model"
     model_temp_path.mkdir()
     initial_config = {"model_type": "test", "vocab_size": 30000}
@@ -151,9 +151,9 @@ def test_load_success(
     neural_sparse_doc_v3_gte_mock_transformers_models,
 ):
     """Test successful load from local path."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(neural_sparse_doc_v3_gte_fake_model_directory)
 
-    model.load(neural_sparse_doc_v3_gte_fake_model_directory)
+    model.load()
 
     assert model._model is not None
     assert model._tokenizer is not None
@@ -161,11 +161,11 @@ def test_load_success(
 
 def test_load_file_not_found():
     """Test load raises FileNotFoundError for missing path."""
-    model = OSNeuralSparseDocV3GTE()
     nonexistent_path = Path("/nonexistent/path")
+    model = OSNeuralSparseDocV3GTE(nonexistent_path)
 
     with pytest.raises(FileNotFoundError, match="Model not found at path"):
-        model.load(nonexistent_path)
+        model.load()
 
 
 def test_load_initializes_model_and_tokenizer(
@@ -173,12 +173,12 @@ def test_load_initializes_model_and_tokenizer(
     neural_sparse_doc_v3_gte_mock_transformers_models,
 ):
     """Test load initializes _model and _tokenizer attributes."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(neural_sparse_doc_v3_gte_fake_model_directory)
 
     assert model._model is None
     assert model._tokenizer is None
 
-    model.load(neural_sparse_doc_v3_gte_fake_model_directory)
+    model.load()
 
     assert model._model is not None
     assert model._tokenizer is not None
@@ -189,9 +189,9 @@ def test_load_sets_up_special_token_ids(
     neural_sparse_doc_v3_gte_mock_transformers_models,
 ):
     """Test load sets up _special_token_ids list."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(neural_sparse_doc_v3_gte_fake_model_directory)
 
-    model.load(neural_sparse_doc_v3_gte_fake_model_directory)
+    model.load()
 
     assert model._special_token_ids is not None
     assert isinstance(model._special_token_ids, list)
@@ -206,9 +206,9 @@ def test_load_sets_up_id_to_token_mapping(
     neural_sparse_doc_v3_gte_mock_transformers_models,
 ):
     """Test load creates _id_to_token mapping correctly."""
-    model = OSNeuralSparseDocV3GTE()
+    model = OSNeuralSparseDocV3GTE(neural_sparse_doc_v3_gte_fake_model_directory)
 
-    model.load(neural_sparse_doc_v3_gte_fake_model_directory)
+    model.load()
 
     assert model._id_to_token is not None
     assert isinstance(model._id_to_token, list)

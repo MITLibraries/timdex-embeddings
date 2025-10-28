@@ -12,6 +12,14 @@ class BaseEmbeddingModel(ABC):
 
     MODEL_URI: str  # Type hint to document the requirement
 
+    def __init__(self, model_path: str | Path) -> None:
+        """Initialize the embedding model with a model path.
+
+        Args:
+            model_path: Path where the model will be downloaded to and loaded from.
+        """
+        self.model_path = Path(model_path)
+
     def __init_subclass__(cls, **kwargs: dict) -> None:  # noqa: D105
         super().__init_subclass__(**kwargs)
 
@@ -28,17 +36,13 @@ class BaseEmbeddingModel(ABC):
         return self.MODEL_URI
 
     @abstractmethod
-    def download(self, output_path: str | Path) -> Path:
-        """Download and prepare model, saving to output_path.
+    def download(self) -> Path:
+        """Download and prepare model, saving to self.model_path.
 
-        Args:
-            output_path: Path where the model zip should be saved.
+        Returns:
+            Path where the model was saved.
         """
 
     @abstractmethod
-    def load(self, model_path: str | Path) -> None:
-        """Load model from local, downloaded instance.
-
-        Args:
-            model_path: Path of local model directory.
-        """
+    def load(self) -> None:
+        """Load model from self.model_path."""

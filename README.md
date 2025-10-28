@@ -24,7 +24,7 @@ WORKSPACE=### Set to `dev` for local development, this will be set to `stage` an
 
 ```shell
 TE_MODEL_URI=# HuggingFace model URI
-TE_MODEL_DOWNLOAD_PATH=# Download location for model
+TE_MODEL_PATH=# Path where the model will be downloaded to and loaded from
 HF_HUB_DISABLE_PROGRESS_BARS=#boolean to use progress bars for HuggingFace model downloads; defaults to 'true' in deployed contexts
 ```
 
@@ -34,7 +34,7 @@ This CLI application is designed to create embeddings for input texts.  To do th
 
 To this end, there is a base embedding class `BaseEmbeddingModel` that is designed to be extended and customized for a particular embedding model.
 
-Once an embedding class has been created, the preferred approach is to set env vars `TE_MODEL_URI` and `TE_MODEL_DOWNLOAD_PATH` directly in the `Dockerfile` to a) download a local snapshot of the model during image build, and b) set this model as the default for the CLI.
+Once an embedding class has been created, the preferred approach is to set env vars `TE_MODEL_URI` and `TE_MODEL_PATH` directly in the `Dockerfile` to a) download a local snapshot of the model during image build, and b) set this model as the default for the CLI.
 
 This allows invoking the CLI without specifying a model URI or local location, allowing this model to serve as the default, e.g.:
 
@@ -61,18 +61,38 @@ Usage: embeddings ping [OPTIONS]
 ```text
 Usage: embeddings download-model [OPTIONS]
 
-  Download a model from HuggingFace and save as zip file.
+  Download a model from HuggingFace and save locally.
 
 Options:
-  --model-uri TEXT  HuggingFace model URI (e.g., 'org/model-name')  [required]
-  --output PATH     Output path for zipped model (e.g., '/path/to/model.zip')
-                    [required]
-  --help            Show this message and exit.
+  --model-uri TEXT   HuggingFace model URI (e.g., 'org/model-name')
+                     [required]
+  --model-path PATH  Path where the model will be downloaded to and loaded
+                     from, e.g. '/path/to/model'.  [required]
+  --help             Show this message and exit.
 ```
 
-### `create-embeddings`
+### `test-model-load`
 ```text
-TODO...
+Usage: embeddings test-model-load [OPTIONS]
+
+  Test loading of embedding class and local model based on env vars.
+
+  In a deployed context, the following env vars are expected:     -
+  TE_MODEL_URI     - TE_MODEL_PATH
+
+  With these set, the embedding class should be registered successfully and
+  initialized, and the model loaded from a local copy.
+
+  This CLI command is NOT used during normal workflows.  This is used primary
+  during development and after model downloading/loading changes to ensure the
+  model loads correctly.
+
+Options:
+  --model-uri TEXT   HuggingFace model URI (e.g., 'org/model-name')
+                     [required]
+  --model-path PATH  Path where the model will be downloaded to and loaded
+                     from, e.g. '/path/to/model'.  [required]
+  --help             Show this message and exit.
 ```
 
 

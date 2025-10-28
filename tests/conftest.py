@@ -27,23 +27,27 @@ class MockEmbeddingModel(BaseEmbeddingModel):
 
     MODEL_URI = "test/mock-model"
 
-    def download(self, output_path: Path) -> Path:
+    def __init__(self, model_path: str | Path) -> None:
+        """Initialize the mock model."""
+        super().__init__(model_path)
+
+    def download(self) -> Path:
         """Create a fake model zip file for testing."""
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(output_path, "w") as zf:
+        self.model_path.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(self.model_path, "w") as zf:
             zf.writestr("config.json", '{"model": "mock", "vocab_size": 30000}')
             zf.writestr("pytorch_model.bin", b"fake model weights")
             zf.writestr("tokenizer.json", '{"version": "1.0"}')
-        return output_path
+        return self.model_path
 
-    def load(self, model_path: str | Path) -> None:  # noqa: ARG002
+    def load(self) -> None:
         logger.info("Model loaded successfully, 1.5s")
 
 
 @pytest.fixture
-def mock_model():
+def mock_model(tmp_path):
     """Fixture providing a MockEmbeddingModel instance."""
-    return MockEmbeddingModel()
+    return MockEmbeddingModel(tmp_path / "model")
 
 
 @pytest.fixture

@@ -30,24 +30,27 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
 
     MODEL_URI = "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte"
 
-    def __init__(self) -> None:
-        """Initialize the model."""
-        super().__init__()
+    def __init__(self, model_path: str | Path) -> None:
+        """Initialize the model.
+
+        Args:
+            model_path: Path where the model will be downloaded to and loaded from.
+        """
+        super().__init__(model_path)
         self._model: PreTrainedModel | None = None
         self._tokenizer: DistilBertTokenizerFast | None = None
         self._special_token_ids: list | None = None
         self._id_to_token: list | None = None
 
-    def download(self, output_path: str | Path) -> Path:
-        """Download and prepare model, saving to output_path.
+    def download(self) -> Path:
+        """Download and prepare model, saving to self.model_path.
 
-        Args:
-            output_path: Path where the model should be saved.
+        Returns:
+            Path where the model was saved.
         """
         start_time = time.perf_counter()
 
-        output_path = Path(output_path)
-        logger.info(f"Downloading model: {self.model_uri}, saving to: {output_path}.")
+        logger.info(f"Downloading model: {self.model_uri}, saving to: {self.model_path}.")
 
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -60,19 +63,21 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             self._patch_local_model_with_alibaba_new_impl(temp_path)
 
             # compress model directory as a zip file
-            if output_path.suffix.lower() == ".zip":
+            if self.model_path.suffix.lower() == ".zip":
                 logger.debug("Creating zip file of model contents.")
-                shutil.make_archive(str(output_path.with_suffix("")), "zip", temp_path)
+                shutil.make_archive(
+                    str(self.model_path.with_suffix("")), "zip", temp_path
+                )
 
             # copy to output directory without zipping
             else:
-                logger.debug(f"Copying model contents to {output_path}")
-                if output_path.exists():
-                    shutil.rmtree(output_path)
-                shutil.copytree(temp_path, output_path)
+                logger.debug(f"Copying model contents to {self.model_path}")
+                if self.model_path.exists():
+                    shutil.rmtree(self.model_path)
+                shutil.copytree(temp_path, self.model_path)
 
         logger.info(f"Model downloaded successfully, {time.perf_counter() - start_time}s")
-        return output_path
+        return self.model_path
 
     def _patch_local_model_with_alibaba_new_impl(self, model_temp_path: Path) -> None:
         """Patch downloaded model with required assets from Alibaba-NLP/new-impl.
@@ -124,28 +129,23 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
 
             logger.debug("Dependency model Alibaba-NLP/new-impl downloaded and used.")
 
-    def load(self, model_path: str | Path) -> None:
-        """Load the model from the specified path.
-
-        Args:
-            model_path: Path to the model directory.
-        """
+    def load(self) -> None:
+        """Load the model from self.model_path."""
         start_time = time.perf_counter()
-        logger.info(f"Loading model from: {model_path}")
-        model_path = Path(model_path)
+        logger.info(f"Loading model from: {self.model_path}")
 
         # ensure model exists locally
-        if not model_path.exists():
-            raise FileNotFoundError(f"Model not found at path: {model_path}")
+        if not self.model_path.exists():
+            raise FileNotFoundError(f"Model not found at path: {self.model_path}")
 
         # load local model and tokenizer
         self._model = AutoModelForMaskedLM.from_pretrained(
-            model_path,
+            self.model_path,
             trust_remote_code=True,
             local_files_only=True,
         )
         self._tokenizer = AutoTokenizer.from_pretrained(  # type: ignore[no-untyped-call]
-            model_path,
+            self.model_path,
             local_files_only=True,
         )
 
