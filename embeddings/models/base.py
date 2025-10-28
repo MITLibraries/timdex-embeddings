@@ -28,9 +28,17 @@ class BaseEmbeddingModel(ABC):
         return self.MODEL_URI
 
     @abstractmethod
-    def download(self, output_path: Path) -> Path:
+    def download(self, output_path: str | Path) -> Path:
         """Download and prepare model, saving to output_path.
 
         Args:
             output_path: Path where the model zip should be saved.
+        """
+
+    @abstractmethod
+    def load(self, model_path: str | Path) -> None:
+        """Load model from local, downloaded instance.
+
+        Args:
+            model_path: Path of local model directory.
         """

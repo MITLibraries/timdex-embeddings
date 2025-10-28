@@ -12,6 +12,8 @@ dependencies = [
     "huggingface-hub>=0.26.0",
     "sentry-sdk>=2.34.1",
     "timdex-dataset-api",
+    "torch>=2.9.0",
+    "transformers>=4.57.1",
 ]
 
 [dependency-groups]
@@ -32,7 +34,10 @@ line-length = 90
 [tool.mypy]
 disallow_untyped_calls = true
 disallow_untyped_defs = true
-exclude = ["tests/"]
+exclude = [
+    "tests/",
+    "output/"
+]
 
 [tool.pytest.ini_options]
 log_level = "INFO"
@@ -101,3 +106,6 @@ embeddings = "embeddings.cli:main"
 [build-system]
 requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["embeddings"]
