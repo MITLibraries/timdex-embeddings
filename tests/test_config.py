@@ -12,11 +12,11 @@ def test_configure_logger_not_verbose():
 
 
 def test_configure_logger_verbose():
-    logger = logging.getLogger(__name__)
+    logger = logging.getLogger("embeddings.cli")
     result = configure_logger(logger, verbose=True)
     debug_log_level = 10
     assert logger.getEffectiveLevel() == debug_log_level
-    assert result == "Logger 'tests.test_config' configured with level=DEBUG"
+    assert result == "Logger 'embeddings.cli' configured with level=DEBUG"
 
 
 def test_configure_sentry_no_env_variable(monkeypatch):

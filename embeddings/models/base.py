@@ -1,7 +1,10 @@
 """Base class for embedding models."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from pathlib import Path
+
+from embeddings.embedding import Embedding, RecordText
 
 
 class BaseEmbeddingModel(ABC):
@@ -46,3 +49,22 @@ class BaseEmbeddingModel(ABC):
     @abstractmethod
     def load(self) -> None:
         """Load model from self.model_path."""
+
+    @abstractmethod
+    def create_embedding(self, input_record: RecordText) -> Embedding:
+        """Create an Embedding for an RecordText.
+
+        Args:
+            input_record: RecordText instance
+        """
+
+    def create_embeddings(
+        self, input_records: Iterator[RecordText]
+    ) -> Iterator[Embedding]:
+        """Yield Embeddings for an iterator of InputRecords.
+
+        Args:
+            input_records: iterator of InputRecords
+        """
+        for input_text in input_records:
+            yield self.create_embedding(input_text)

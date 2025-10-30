@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "click>=8.2.1",
     "huggingface-hub>=0.26.0",
+    "jsonlines>=4.0.0",
     "sentry-sdk>=2.34.1",
     "timdex-dataset-api",
     "torch>=2.9.0",
@@ -38,6 +39,11 @@ exclude = [
     "tests/",
     "output/"
 ]
+
+[[tool.mypy.overrides]]
+module = ["timdex_dataset_api.*"]
+follow_untyped_imports = true
+
 
 [tool.pytest.ini_options]
 log_level = "INFO"
@@ -88,6 +94,7 @@ fixture-parentheses = false
 "tests/**/*" = [
     "ANN",
     "ARG001",
+    "PLR2004",
     "S101",
 ]
 
