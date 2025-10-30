@@ -1,6 +1,6 @@
 """Tests for OSNeuralSparseDocV3GTE embedding model."""
 
-# ruff: noqa: SLF001, PLR2004
+# ruff: noqa: SLF001
 
 import json
 from pathlib import Path

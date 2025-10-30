@@ -11,8 +11,6 @@ def configure_logger(logger: logging.Logger, *, verbose: bool) -> str:
             "%(message)s"
         )
         logger.setLevel(logging.DEBUG)
-        for handler in logging.root.handlers:
-            handler.addFilter(logging.Filter("embeddings"))
     else:
         logging.basicConfig(
             format="%(asctime)s %(levelname)s %(name)s.%(funcName)s(): %(message)s"
