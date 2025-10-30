@@ -4,24 +4,27 @@ import pytest
 
 from embeddings.models.base import BaseEmbeddingModel
 from embeddings.models.registry import MODEL_REGISTRY, get_model_class
+from tests.conftest import MockEmbeddingModel
 
 
 def test_mock_model_instantiation(mock_model):
     assert mock_model.model_uri == "test/mock-model"
 
 
-def test_mock_model_download_creates_zip(mock_model, tmp_path):
+def test_mock_model_download_creates_zip(tmp_path):
     output_path = tmp_path / "test_model.zip"
-    result = mock_model.download(output_path)
+    mock_model = MockEmbeddingModel(output_path)
+    result = mock_model.download()
 
     assert result == output_path
     assert output_path.exists()
     assert zipfile.is_zipfile(output_path)
 
 
-def test_mock_model_download_contains_expected_files(mock_model, tmp_path):
+def test_mock_model_download_contains_expected_files(tmp_path):
     output_path = tmp_path / "test_model.zip"
-    mock_model.download(output_path)
+    mock_model = MockEmbeddingModel(output_path)
+    mock_model.download()
 
     with zipfile.ZipFile(output_path, "r") as zf:
         file_list = zf.namelist()
