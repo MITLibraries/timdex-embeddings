@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from embeddings.embedding import Embedding, RecordText
+from embeddings.embedding import Embedding, EmbeddingInput
 from embeddings.models import registry
 from embeddings.models.base import BaseEmbeddingModel
 
@@ -45,7 +45,7 @@ class MockEmbeddingModel(BaseEmbeddingModel):
     def load(self) -> None:
         logger.info("Model loaded successfully, 1.5s")
 
-    def create_embedding(self, input_record: RecordText) -> Embedding:
+    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
         return Embedding(
             timdex_record_id=input_record.timdex_record_id,
             run_id=input_record.run_id,

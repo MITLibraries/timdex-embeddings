@@ -230,10 +230,10 @@ def create_embeddings(
     # DEBUG ------------------------------------------------------------------------------
     import json  # noqa: PLC0415
 
-    from embeddings.embedding import RecordText  # noqa: PLC0415
+    from embeddings.embedding import EmbeddingInput  # noqa: PLC0415
 
     input_records = (
-        RecordText(
+        EmbeddingInput(
             timdex_record_id=timdex_record["timdex_record_id"],
             run_id=timdex_record["run_id"],
             run_record_offset=timdex_record["run_record_offset"],

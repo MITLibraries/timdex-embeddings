@@ -4,8 +4,12 @@ from dataclasses import asdict, dataclass, field
 
 
 @dataclass
-class RecordText:
-    """Input record for creating an embedding for.
+class EmbeddingInput:
+    """Encapsulates the inputs for an embedding.
+
+    When creating an embedding, we need to note what TIMDEX record the embedding is
+    associated with and what strategy was used to prepare the embedding input text from
+    the record itself.
 
     Args:
         (timdex_record_id, run_id, run_record_offset): composite key for TIMDEX record

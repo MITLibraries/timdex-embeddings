@@ -2,7 +2,7 @@ import zipfile
 
 import pytest
 
-from embeddings.embedding import RecordText
+from embeddings.embedding import EmbeddingInput
 from embeddings.models.base import BaseEmbeddingModel
 from embeddings.models.registry import MODEL_REGISTRY, get_model_class
 
@@ -35,7 +35,7 @@ def test_mock_model_load(caplog, mock_model):
 
 
 def test_mock_model_create_embedding(mock_model):
-    input_record = RecordText(
+    input_record = EmbeddingInput(
         timdex_record_id="test-id",
         run_id="test-run",
         run_record_offset=42,
@@ -87,14 +87,14 @@ def test_subclass_with_non_string_model_uri_raises_type_error():
 
 def test_base_model_create_embeddings_calls_create_embedding(mock_model):
     input_records = [
-        RecordText(
+        EmbeddingInput(
             timdex_record_id="id-1",
             run_id="run-1",
             run_record_offset=0,
             embedding_strategy="full_record",
             text="text 1",
         ),
-        RecordText(
+        EmbeddingInput(
             timdex_record_id="id-2",
             run_id="run-1",
             run_record_offset=1,

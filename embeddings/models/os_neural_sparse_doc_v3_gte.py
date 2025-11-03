@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from huggingface_hub import snapshot_download
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
-from embeddings.embedding import Embedding, RecordText
+from embeddings.embedding import Embedding, EmbeddingInput
 from embeddings.models.base import BaseEmbeddingModel
 
 if TYPE_CHECKING:
@@ -163,5 +163,5 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
 
         logger.info(f"Model loaded successfully, {time.perf_counter()-start_time}s")
 
-    def create_embedding(self, input_record: RecordText) -> Embedding:
+    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
         raise NotImplementedError
