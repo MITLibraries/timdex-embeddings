@@ -1,4 +1,5 @@
 import functools
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -12,6 +13,8 @@ from timdex_dataset_api import TIMDEXDataset
 
 from embeddings.config import configure_logger, configure_sentry
 from embeddings.models.registry import get_model_class
+from embeddings.strategies.processor import create_embedding_inputs
+from embeddings.strategies.registry import STRATEGY_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -181,10 +184,13 @@ def test_model_load(ctx: click.Context) -> None:
 )
 @click.option(
     "--strategy",
-    type=str,  # WIP: establish an enum of supported strategies
+    type=click.Choice(list(STRATEGY_REGISTRY.keys())),
     required=True,
     multiple=True,
-    help="Pre-embedding record transformation strategy to use.  Repeatable.",
+    help=(
+        "Pre-embedding record transformation strategy. "
+        "Repeatable to apply multiple strategies."
+    ),
 )
 @click.option(
     "--output-jsonl",
@@ -222,48 +228,11 @@ def create_embeddings(
         action="index",
     )
 
-    # create an iterator of InputTexts applying all requested strategies to all records
-    # WIP NOTE: this will leverage some kind of pre-embedding transformer class(es) that
-    #   create texts based on the requested strategies (e.g. "full record"), which are
-    #   captured in --strategy CLI args
-    # WIP NOTE: the following simulates that...
-    # DEBUG ------------------------------------------------------------------------------
-    import json  # noqa: PLC0415
+    # create an iterator of EmbeddingInputs applying all requested strategies
+    input_records = create_embedding_inputs(timdex_records, list(strategy))
 
-    from embeddings.embedding import EmbeddingInput  # noqa: PLC0415
-
-    input_records = (
-        EmbeddingInput(
-            timdex_record_id=timdex_record["timdex_record_id"],
-            run_id=timdex_record["run_id"],
-            run_record_offset=timdex_record["run_record_offset"],
-            embedding_strategy=_strategy,
-            text=json.dumps(timdex_record["transformed_record"].decode()),
-        )
-        for timdex_record in timdex_records
-        for _strategy in strategy
-    )
-    # DEBUG ------------------------------------------------------------------------------
-
-    # create an iterator of Embeddings via the embedding model
-    # WIP NOTE: this will use the embedding class .create_embeddings() bulk method
-    # WIP NOTE: the following simulates that...
-    # DEBUG ------------------------------------------------------------------------------
-    from embeddings.embedding import Embedding  # noqa: PLC0415
-
-    embeddings = (
-        Embedding(
-            timdex_record_id=input_record.timdex_record_id,
-            run_id=input_record.run_id,
-            run_record_offset=input_record.run_record_offset,
-            embedding_strategy=input_record.embedding_strategy,
-            model_uri=model.model_uri,
-            embedding_vector=[0.1, 0.2, 0.3],
-            embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
-        )
-        for input_record in input_records
-    )
-    # DEBUG ------------------------------------------------------------------------------
+    # create embeddings via the embedding model
+    embeddings = model.create_embeddings(input_records)
 
     # if requested, write embeddings to a local JSONLines file
     if output_jsonl:
