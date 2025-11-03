@@ -49,7 +49,8 @@ def test_mock_model_create_embedding(mock_model):
     assert embedding.run_record_offset == 42
     assert embedding.embedding_strategy == "full_record"
     assert embedding.model_uri == "test/mock-model"
-    assert embedding.embedding == {"coffee": 0.9, "seattle": 0.5}
+    assert embedding.embedding_vector == [0.1, 0.2, 0.3]
+    assert embedding.embedding_token_weights == {"coffee": 0.9, "seattle": 0.5}
 
 
 def test_registry_contains_opensearch_model():

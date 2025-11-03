@@ -258,7 +258,8 @@ def create_embeddings(
             run_record_offset=input_record.run_record_offset,
             embedding_strategy=input_record.embedding_strategy,
             model_uri=model.model_uri,
-            embedding={"coffee": 0.9, "seattle": 0.5},
+            embedding_vector=[0.1, 0.2, 0.3],
+            embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
         )
         for input_record in input_records
     )

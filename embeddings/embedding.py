@@ -32,7 +32,9 @@ class Embedding:
         (timdex_record_id, run_id, run_record_offset): composite key for TIMDEX record
         model_uri: model URI used to create the embedding
         embedding_strategy: strategy used to create text for embedding
-        embedding: model embedding created from text
+        embedding_vector: vector representation of embedding
+        embedding_token_weights: decoded token:weight pairs from sparse vector
+            - only applicable to models that produce this output
     """
 
     timdex_record_id: str
@@ -40,7 +42,8 @@ class Embedding:
     run_record_offset: int
     model_uri: str
     embedding_strategy: str
-    embedding: dict | list[float]
+    embedding_vector: list[float]
+    embedding_token_weights: dict
 
     timestamp: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC)
