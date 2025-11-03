@@ -95,4 +95,28 @@ Options:
   --help             Show this message and exit.
 ```
 
+### `create-embeddings`
+```text
+Usage: embeddings create-embeddings [OPTIONS]
 
+  Create embeddings for TIMDEX records.
+
+Options:
+  --model-uri TEXT             HuggingFace model URI (e.g., 'org/model-name')
+                               [required]
+  --model-path PATH            Path where the model will be downloaded to and
+                               loaded from, e.g. '/path/to/model'.  [required]
+  -d, --dataset-location PATH  TIMDEX dataset location, e.g.
+                               's3://timdex/dataset', to read records from.
+                               [required]
+  --run-id TEXT                TIMDEX ETL run id.  [required]
+  --run-record-offset INTEGER  TIMDEX ETL run record offset to start from,
+                               default = 0.  [required]
+  --record-limit INTEGER       Limit number of records after --run-record-
+                               offset, default = None (unlimited).  [required]
+  --strategy TEXT              Pre-embedding record transformation strategy to
+                               use.  Repeatable.  [required]
+  --output-jsonl TEXT          Optionally write embeddings to local JSONLines
+                               file (primarily for testing).
+  --help                       Show this message and exit.
+```

@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from embeddings.embedding import Embedding, EmbeddingInput
+from embeddings.models import registry
 from embeddings.models.base import BaseEmbeddingModel
 
 logger = logging.getLogger(__name__)
@@ -43,11 +45,29 @@ class MockEmbeddingModel(BaseEmbeddingModel):
     def load(self) -> None:
         logger.info("Model loaded successfully, 1.5s")
 
+    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
+        return Embedding(
+            timdex_record_id=input_record.timdex_record_id,
+            run_id=input_record.run_id,
+            run_record_offset=input_record.run_record_offset,
+            embedding_strategy=input_record.embedding_strategy,
+            model_uri=self.model_uri,
+            embedding_vector=[0.1, 0.2, 0.3],
+            embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
+        )
+
 
 @pytest.fixture
 def mock_model(tmp_path):
     """Fixture providing a MockEmbeddingModel instance."""
     return MockEmbeddingModel(tmp_path / "model")
+
+
+@pytest.fixture
+def register_mock_model(monkeypatch):
+    """Register MockEmbeddingModel in the model registry."""
+    monkeypatch.setitem(registry.MODEL_REGISTRY, "test/mock-model", MockEmbeddingModel)
+    monkeypatch.setenv("TE_MODEL_PATH", "/fake/path")
 
 
 @pytest.fixture

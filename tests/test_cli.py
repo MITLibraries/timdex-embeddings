@@ -1,6 +1,4 @@
 from embeddings.cli import main
-from embeddings.models import registry
-from tests.conftest import MockEmbeddingModel
 
 
 def test_cli_default_logging(caplog, runner):
@@ -27,10 +25,10 @@ def test_download_model_unknown_uri(caplog, runner):
     assert "Unknown model URI" in caplog.text
 
 
-def test_model_required_decorator_with_cli_option(caplog, monkeypatch, runner, tmp_path):
+def test_model_required_decorator_with_cli_option(
+    caplog, register_mock_model, runner, tmp_path
+):
     """Test decorator successfully initializes model from --model-uri option."""
-    monkeypatch.setitem(registry.MODEL_REGISTRY, "test/mock-model", MockEmbeddingModel)
-
     output_path = tmp_path / "model.zip"
     result = runner.invoke(
         main,
@@ -51,9 +49,10 @@ def test_model_required_decorator_with_cli_option(caplog, monkeypatch, runner, t
     assert output_path.exists()
 
 
-def test_model_required_decorator_with_env_var(caplog, monkeypatch, runner, tmp_path):
+def test_model_required_decorator_with_env_var(
+    caplog, monkeypatch, register_mock_model, runner, tmp_path
+):
     """Test decorator successfully initializes model from TE_MODEL_URI env var."""
-    monkeypatch.setitem(registry.MODEL_REGISTRY, "test/mock-model", MockEmbeddingModel)
     monkeypatch.setenv("TE_MODEL_URI", "test/mock-model")
 
     output_path = tmp_path / "model.zip"
@@ -76,11 +75,9 @@ def test_model_required_decorator_missing_parameter(runner):
 
 
 def test_model_required_decorator_stores_model_in_context(
-    caplog, monkeypatch, runner, tmp_path
+    caplog, register_mock_model, runner, tmp_path
 ):
     """Test decorator stores model instance in ctx.obj['model']."""
-    monkeypatch.setitem(registry.MODEL_REGISTRY, "test/mock-model", MockEmbeddingModel)
-
     output_path = tmp_path / "model.zip"
     result = runner.invoke(
         main,
@@ -99,10 +96,10 @@ def test_model_required_decorator_stores_model_in_context(
     assert output_path.exists()
 
 
-def test_model_required_decorator_log_message(caplog, monkeypatch, runner, tmp_path):
+def test_model_required_decorator_log_message(
+    caplog, register_mock_model, runner, tmp_path
+):
     """Test decorator logs correct initialization message."""
-    monkeypatch.setitem(registry.MODEL_REGISTRY, "test/mock-model", MockEmbeddingModel)
-
     output_path = tmp_path / "model.zip"
     result = runner.invoke(
         main,
@@ -122,11 +119,10 @@ def test_model_required_decorator_log_message(caplog, monkeypatch, runner, tmp_p
     )
 
 
-def test_model_required_decorator_works_across_commands(caplog, monkeypatch, runner):
+def test_model_required_decorator_works_across_commands(
+    caplog, register_mock_model, runner
+):
     """Test decorator works for multiple commands (test_model_load)."""
-    monkeypatch.setitem(registry.MODEL_REGISTRY, "test/mock-model", MockEmbeddingModel)
-    monkeypatch.setenv("TE_MODEL_PATH", "/fake/path")
-
     result = runner.invoke(main, ["test-model-load", "--model-uri", "test/mock-model"])
 
     assert result.exit_code == 0
@@ -135,3 +131,41 @@ def test_model_required_decorator_works_across_commands(caplog, monkeypatch, run
         "'test/mock-model'" in caplog.text
     )
     assert "OK" in result.output
+
+
+def test_create_embeddings_requires_dataset_location(register_mock_model, runner):
+    result = runner.invoke(main, ["create-embeddings", "--model-uri", "test/mock-model"])
+    assert result.exit_code != 0
+    assert "--dataset-location" in result.output
+
+
+def test_create_embeddings_requires_run_id(register_mock_model, runner):
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--dataset-location",
+            "s3://test",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Missing option '--run-id'" in result.output
+
+
+def test_create_embeddings_requires_strategy(register_mock_model, runner):
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--dataset-location",
+            "s3://test",
+            "--run-id",
+            "run-1",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Missing option '--strategy'" in result.output

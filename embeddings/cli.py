@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
+import jsonlines
+from timdex_dataset_api import TIMDEXDataset
 
 from embeddings.config import configure_logger, configure_sentry
 from embeddings.models.registry import get_model_class
@@ -150,8 +152,140 @@ def test_model_load(ctx: click.Context) -> None:
 @main.command()
 @click.pass_context
 @model_required
-def create_embedding(ctx: click.Context) -> None:
-    """Create a single embedding for a single input text."""
+@click.option(
+    "-d",
+    "--dataset-location",
+    required=True,
+    type=click.Path(),
+    help="TIMDEX dataset location, e.g. 's3://timdex/dataset', to read records from.",
+)
+@click.option(
+    "--run-id",
+    required=True,
+    type=str,
+    help="TIMDEX ETL run id.",
+)
+@click.option(
+    "--run-record-offset",
+    required=True,
+    type=int,
+    default=0,
+    help="TIMDEX ETL run record offset to start from, default = 0.",
+)
+@click.option(
+    "--record-limit",
+    required=True,
+    type=int,
+    default=None,
+    help="Limit number of records after --run-record-offset, default = None (unlimited).",
+)
+@click.option(
+    "--strategy",
+    type=str,  # WIP: establish an enum of supported strategies
+    required=True,
+    multiple=True,
+    help="Pre-embedding record transformation strategy to use.  Repeatable.",
+)
+@click.option(
+    "--output-jsonl",
+    required=False,
+    type=str,
+    default=None,
+    help="Optionally write embeddings to local JSONLines file (primarily for testing).",
+)
+def create_embeddings(
+    ctx: click.Context,
+    dataset_location: str,
+    run_id: str,
+    run_record_offset: int,
+    record_limit: int,
+    strategy: list[str],
+    output_jsonl: str,
+) -> None:
+    """Create embeddings for TIMDEX records."""
+    model: BaseEmbeddingModel = ctx.obj["model"]
+
+    # init TIMDEXDataset
+    timdex_dataset = TIMDEXDataset(dataset_location)
+
+    # query TIMDEX dataset for an iterator of records
+    timdex_records = timdex_dataset.read_dicts_iter(
+        columns=[
+            "timdex_record_id",
+            "run_id",
+            "run_record_offset",
+            "transformed_record",
+        ],
+        run_id=run_id,
+        where=f"""run_record_offset >= {run_record_offset}""",
+        limit=record_limit,
+        action="index",
+    )
+
+    # create an iterator of InputTexts applying all requested strategies to all records
+    # WIP NOTE: this will leverage some kind of pre-embedding transformer class(es) that
+    #   create texts based on the requested strategies (e.g. "full record"), which are
+    #   captured in --strategy CLI args
+    # WIP NOTE: the following simulates that...
+    # DEBUG ------------------------------------------------------------------------------
+    import json  # noqa: PLC0415
+
+    from embeddings.embedding import EmbeddingInput  # noqa: PLC0415
+
+    input_records = (
+        EmbeddingInput(
+            timdex_record_id=timdex_record["timdex_record_id"],
+            run_id=timdex_record["run_id"],
+            run_record_offset=timdex_record["run_record_offset"],
+            embedding_strategy=_strategy,
+            text=json.dumps(timdex_record["transformed_record"].decode()),
+        )
+        for timdex_record in timdex_records
+        for _strategy in strategy
+    )
+    # DEBUG ------------------------------------------------------------------------------
+
+    # create an iterator of Embeddings via the embedding model
+    # WIP NOTE: this will use the embedding class .create_embeddings() bulk method
+    # WIP NOTE: the following simulates that...
+    # DEBUG ------------------------------------------------------------------------------
+    from embeddings.embedding import Embedding  # noqa: PLC0415
+
+    embeddings = (
+        Embedding(
+            timdex_record_id=input_record.timdex_record_id,
+            run_id=input_record.run_id,
+            run_record_offset=input_record.run_record_offset,
+            embedding_strategy=input_record.embedding_strategy,
+            model_uri=model.model_uri,
+            embedding_vector=[0.1, 0.2, 0.3],
+            embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
+        )
+        for input_record in input_records
+    )
+    # DEBUG ------------------------------------------------------------------------------
+
+    # if requested, write embeddings to a local JSONLines file
+    if output_jsonl:
+        with jsonlines.open(
+            output_jsonl,
+            mode="w",
+            dumps=lambda obj: json.dumps(
+                obj,
+                default=str,
+            ),
+        ) as writer:
+            for embedding in embeddings:
+                writer.write(embedding.to_dict())
+
+    # else, default writing embeddings back to TIMDEX dataset
+    else:
+        # WIP NOTE: write via anticipated timdex_dataset.embeddings.write(...)
+        # NOTE: will likely use an imported TIMDEXEmbedding class from TDA, which the
+        #   Embedding instance will nearly 1:1 map to.
+        raise NotImplementedError
+
+    logger.info("Embeddings creation complete.")
 
 
 if __name__ == "__main__":  # pragma: no cover
