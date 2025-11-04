@@ -114,8 +114,9 @@ Options:
                                default = 0.  [required]
   --record-limit INTEGER       Limit number of records after --run-record-
                                offset, default = None (unlimited).  [required]
-  --strategy TEXT              Pre-embedding record transformation strategy to
-                               use.  Repeatable.  [required]
+  --strategy [full_record]     Pre-embedding record transformation strategy.
+                               Repeatable to apply multiple strategies.
+                               [required]
   --output-jsonl TEXT          Optionally write embeddings to local JSONLines
                                file (primarily for testing).
   --help                       Show this message and exit.
