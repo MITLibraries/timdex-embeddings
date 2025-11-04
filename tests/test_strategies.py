@@ -8,22 +8,14 @@ from embeddings.strategies.processor import create_embedding_inputs
 from embeddings.strategies.registry import get_strategy_class
 
 
-def test_full_record_strategy_creates_embedding_input():
-    transformed_record = {"timdex_record_id": "test-123", "title": ["Test Title"]}
-    strategy = FullRecordStrategy(
-        timdex_record_id="test-123",
-        run_id="run-456",
-        run_record_offset=42,
-        transformed_record=transformed_record,
-    )
+def test_full_record_strategy_extracts_text():
+    timdex_record = {"timdex_record_id": "test-123", "title": ["Test Title"]}
+    strategy = FullRecordStrategy()
 
-    embedding_input = strategy.to_embedding_input()
+    text = strategy.extract_text(timdex_record)
 
-    assert embedding_input.timdex_record_id == "test-123"
-    assert embedding_input.run_id == "run-456"
-    assert embedding_input.run_record_offset == 42
-    assert embedding_input.embedding_strategy == "full_record"
-    assert embedding_input.text == json.dumps(transformed_record)
+    assert text == json.dumps(timdex_record)
+    assert strategy.STRATEGY_NAME == "full_record"
 
 
 def test_create_embedding_inputs_yields_cartesian_product():

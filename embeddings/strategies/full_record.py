@@ -8,6 +8,6 @@ class FullRecordStrategy(BaseStrategy):
 
     STRATEGY_NAME = "full_record"
 
-    def extract_text(self) -> str:
+    def extract_text(self, timdex_record: dict) -> str:
         """Serialize the entire transformed_record as JSON."""
-        return json.dumps(self.transformed_record)
+        return json.dumps(timdex_record)

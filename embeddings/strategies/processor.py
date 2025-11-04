@@ -6,7 +6,7 @@ from embeddings.strategies.registry import get_strategy_class
 
 
 def create_embedding_inputs(
-    timdex_records: Iterator[dict],
+    timdex_dataset_records: Iterator[dict],
     strategies: list[str],
 ) -> Iterator[EmbeddingInput]:
     """Yield EmbeddingInput instances for all records x all strategies.
@@ -15,7 +15,7 @@ def create_embedding_inputs(
     yielding one EmbeddingInput per combination.
 
     Args:
-        timdex_records: Iterator of TIMDEX records.
+        timdex_dataset_records: Iterator of TIMDEX records.
             Expected keys: timdex_record_id, run_id, run_record_offset,
             transformed_record (bytes)
         strategies: List of strategy names to apply
@@ -26,17 +26,24 @@ def create_embedding_inputs(
     Example:
         100 records x 3 strategies = 300 EmbeddingInput instances
     """
-    for timdex_record in timdex_records:
-        # decode and parse the TIMDEX JSON record
-        transformed_record = json.loads(timdex_record["transformed_record"].decode())
+    # instantiate strategy transformers
+    transformers = [get_strategy_class(strategy)() for strategy in strategies]
 
-        # apply all strategies to the record and yield
-        for strategy_name in strategies:
-            strategy_class = get_strategy_class(strategy_name)
-            strategy_instance = strategy_class(
-                timdex_record_id=timdex_record["timdex_record_id"],
-                run_id=timdex_record["run_id"],
-                run_record_offset=timdex_record["run_record_offset"],
-                transformed_record=transformed_record,
+    # loop through records and apply all strategies, yielding an EmbeddingInput for each
+    for timdex_dataset_record in timdex_dataset_records:
+
+        # decode and parse the TIMDEX JSON record once for all requested strategies
+        timdex_record = json.loads(timdex_dataset_record["transformed_record"].decode())
+
+        for transformer in transformers:
+            # prepare text for embedding from transformer strategy
+            text = transformer.extract_text(timdex_record)
+
+            # emit an EmbeddingInput instance
+            yield EmbeddingInput(
+                timdex_record_id=timdex_dataset_record["timdex_record_id"],
+                run_id=timdex_dataset_record["run_id"],
+                run_record_offset=timdex_dataset_record["run_record_offset"],
+                embedding_strategy=transformer.STRATEGY_NAME,
+                text=text,
             )
-            yield strategy_instance.to_embedding_input()
