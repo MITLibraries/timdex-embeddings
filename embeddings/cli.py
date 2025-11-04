@@ -210,6 +210,7 @@ def create_embeddings(
 ) -> None:
     """Create embeddings for TIMDEX records."""
     model: BaseEmbeddingModel = ctx.obj["model"]
+    model.load()
 
     # init TIMDEXDataset
     timdex_dataset = TIMDEXDataset(dataset_location)
