@@ -36,11 +36,11 @@ class BaseStrategy(ABC):
 
         # require class level STRATEGY_NAME to be set
         if not hasattr(cls, "STRATEGY_NAME"):
-            msg = f"{cls.__name__} must define 'STRATEGY_NAME' class attribute"
-            raise TypeError(msg)
+            raise TypeError(f"{cls.__name__} must define 'STRATEGY_NAME' class attribute")
         if not isinstance(cls.STRATEGY_NAME, str):
-            msg = f"{cls.__name__} must override 'STRATEGY_NAME' with a valid string"
-            raise TypeError(msg)
+            raise TypeError(
+                f"{cls.__name__} must override 'STRATEGY_NAME' with a valid string"
+            )
 
     @abstractmethod
     def extract_text(self) -> str:
