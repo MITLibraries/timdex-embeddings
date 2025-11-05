@@ -1,0 +1,3 @@
+{"timdex_record_id": "record:1", "run_id": "abc123", "run_record_offset": 0, "transformed_record": "{\"title\":\"Record 1\",\"description\":\"This is a record about coffee in the mountains.\"}"}
+{"timdex_record_id": "record:2", "run_id": "abc123", "run_record_offset": 1, "transformed_record": "{\"title\":\"Record 2\",\"description\":\"Sometimes poetry is made accidentally by the fabrication of metadata.\"}"}
+{"timdex_record_id": "record:3", "run_id": "abc123", "run_record_offset": 2, "transformed_record": "{\"title\":\"Record 3\",\"description\":\"This is an oddball record, meant to evoke the peculiar nature of mathematics.\"}"}

@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import click
 import jsonlines
+import smart_open
 from timdex_dataset_api import TIMDEXDataset
 
 from embeddings.config import configure_logger, configure_sentry
@@ -156,31 +157,40 @@ def test_model_load(ctx: click.Context) -> None:
 @click.pass_context
 @model_required
 @click.option(
-    "-d",
     "--dataset-location",
-    required=True,
+    required=False,
     type=click.Path(),
     help="TIMDEX dataset location, e.g. 's3://timdex/dataset', to read records from.",
 )
 @click.option(
     "--run-id",
-    required=True,
+    required=False,
     type=str,
     help="TIMDEX ETL run id.",
 )
 @click.option(
     "--run-record-offset",
-    required=True,
+    required=False,
     type=int,
     default=0,
     help="TIMDEX ETL run record offset to start from, default = 0.",
 )
 @click.option(
     "--record-limit",
-    required=True,
+    required=False,
     type=int,
     default=None,
     help="Limit number of records after --run-record-offset, default = None (unlimited).",
+)
+@click.option(
+    "--input-jsonl",
+    required=False,
+    type=str,
+    default=None,
+    help=(
+        "Optional filepath to JSONLines file containing "
+        "TIMDEX records to create embeddings from."
+    ),
 )
 @click.option(
     "--strategy",
@@ -205,6 +215,7 @@ def create_embeddings(
     run_id: str,
     run_record_offset: int,
     record_limit: int,
+    input_jsonl: str,
     strategy: list[str],
     output_jsonl: str,
 ) -> None:
@@ -212,22 +223,37 @@ def create_embeddings(
     model: BaseEmbeddingModel = ctx.obj["model"]
     model.load()
 
-    # init TIMDEXDataset
-    timdex_dataset = TIMDEXDataset(dataset_location)
+    # read input records from TIMDEX dataset (default) or a JSONLines file
+    if input_jsonl:
+        with (
+            smart_open.open(input_jsonl, "r") as file_obj,  # type: ignore[no-untyped-call]
+            jsonlines.Reader(file_obj) as reader,
+        ):
+            timdex_records = iter(list(reader))
 
-    # query TIMDEX dataset for an iterator of records
-    timdex_records = timdex_dataset.read_dicts_iter(
-        columns=[
-            "timdex_record_id",
-            "run_id",
-            "run_record_offset",
-            "transformed_record",
-        ],
-        run_id=run_id,
-        where=f"""run_record_offset >= {run_record_offset}""",
-        limit=record_limit,
-        action="index",
-    )
+    else:
+        if not dataset_location or not run_id:
+            raise click.UsageError(
+                "Both '--dataset-location' and '--run-id' are required arguments "
+                "when reading input records from the TIMDEX dataset."
+            )
+
+        # init TIMDEXDataset
+        timdex_dataset = TIMDEXDataset(dataset_location)
+
+        # query TIMDEX dataset for an iterator of records
+        timdex_records = timdex_dataset.read_dicts_iter(
+            columns=[
+                "timdex_record_id",
+                "run_id",
+                "run_record_offset",
+                "transformed_record",
+            ],
+            run_id=run_id,
+            where=f"""run_record_offset >= {run_record_offset}""",
+            limit=record_limit,
+            action="index",
+        )
 
     # create an iterator of EmbeddingInputs applying all requested strategies
     embedding_inputs = create_embedding_inputs(timdex_records, list(strategy))
@@ -235,20 +261,17 @@ def create_embeddings(
     # create embeddings via the embedding model
     embeddings = model.create_embeddings(embedding_inputs)
 
-    # if requested, write embeddings to a local JSONLines file
+    # write embeddings to TIMDEX dataset (default) or to a JSONLines file
     if output_jsonl:
-        with jsonlines.open(
-            output_jsonl,
-            mode="w",
-            dumps=lambda obj: json.dumps(
-                obj,
-                default=str,
-            ),
-        ) as writer:
+        with (
+            smart_open.open(output_jsonl, "w") as s3_file,  # type: ignore[no-untyped-call]
+            jsonlines.Writer(
+                s3_file,
+                dumps=lambda obj: json.dumps(obj, default=str),
+            ) as writer,
+        ):
             for embedding in embeddings:
                 writer.write(embedding.to_dict())
-
-    # else, default writing embeddings back to TIMDEX dataset
     else:
         # WIP NOTE: write via anticipated timdex_dataset.embeddings.write(...)
         # NOTE: will likely use an imported TIMDEXEmbedding class from TDA, which the

@@ -133,27 +133,6 @@ def test_model_required_decorator_works_across_commands(
     assert "OK" in result.output
 
 
-def test_create_embeddings_requires_dataset_location(register_mock_model, runner):
-    result = runner.invoke(main, ["create-embeddings", "--model-uri", "test/mock-model"])
-    assert result.exit_code != 0
-    assert "--dataset-location" in result.output
-
-
-def test_create_embeddings_requires_run_id(register_mock_model, runner):
-    result = runner.invoke(
-        main,
-        [
-            "create-embeddings",
-            "--model-uri",
-            "test/mock-model",
-            "--dataset-location",
-            "s3://test",
-        ],
-    )
-    assert result.exit_code != 0
-    assert "Missing option '--run-id'" in result.output
-
-
 def test_create_embeddings_requires_strategy(register_mock_model, runner):
     result = runner.invoke(
         main,
@@ -169,3 +148,82 @@ def test_create_embeddings_requires_strategy(register_mock_model, runner):
     )
     assert result.exit_code != 0
     assert "Missing option '--strategy'" in result.output
+
+
+def test_create_embeddings_requires_dataset_location(register_mock_model, runner):
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--run-id",
+            "run-1",
+            "--strategy",
+            "full_record",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Both '--dataset-location' and '--run-id' are required" in result.output
+
+
+def test_create_embeddings_requires_run_id(register_mock_model, runner):
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--dataset-location",
+            "s3://test",
+            "--strategy",
+            "full_record",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Both '--dataset-location' and '--run-id' are required" in result.output
+
+
+def test_create_embeddings_optional_input_jsonl(register_mock_model, runner, tmp_path):
+    input_file = "tests/fixtures/cli_inputs/test-3-records.jsonl"
+    output_file = tmp_path / "output.jsonl"
+
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--input-jsonl",
+            input_file,
+            "--strategy",
+            "full_record",
+            "--output-jsonl",
+            str(output_file),
+        ],
+    )
+    assert result.exit_code == 0
+    assert output_file.exists()
+
+
+def test_create_embeddings_optional_input_jsonl_does_not_require_dataset_params(
+    register_mock_model, runner, tmp_path
+):
+    input_file = "tests/fixtures/cli_inputs/test-3-records.jsonl"
+    output_file = tmp_path / "output.jsonl"
+
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--input-jsonl",
+            input_file,
+            "--strategy",
+            "full_record",
+            "--output-jsonl",
+            str(output_file),
+        ],
+    )
+    assert result.exit_code == 0
