@@ -51,20 +51,20 @@ class BaseEmbeddingModel(ABC):
         """Load model from self.model_path."""
 
     @abstractmethod
-    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
+    def create_embedding(self, embedding_input: EmbeddingInput) -> Embedding:
         """Create an Embedding for an EmbeddingInput.
 
         Args:
-            input_record: EmbeddingInput instance
+            embedding_input: EmbeddingInput instance
         """
 
     def create_embeddings(
-        self, input_records: Iterator[EmbeddingInput]
+        self, embedding_inputs: Iterator[EmbeddingInput]
     ) -> Iterator[Embedding]:
-        """Yield Embeddings for an iterator of InputRecords.
+        """Yield Embeddings for a batch of EmbeddingInputs.
 
         Args:
-            input_records: iterator of InputRecords
+            embedding_inputs: iterator of EmbeddingInputs
         """
-        for input_text in input_records:
-            yield self.create_embedding(input_text)
+        for embedding_input in embedding_inputs:
+            yield self.create_embedding(embedding_input)

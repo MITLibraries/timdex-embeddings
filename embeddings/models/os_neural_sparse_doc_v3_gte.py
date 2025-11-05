@@ -173,32 +173,24 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             f"{time.perf_counter() - start_time:.2f}s"
         )
 
-    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
-        """Create sparse embeddings for the input text (document encoding).
-
-        This method generates sparse document embeddings.
-
-        Process follows the model card exactly:
-        1. Tokenize the document
-        2. Pass through the masked language model to get logits
-        3. Convert logits to sparse vector
-        6. Return both raw sparse vector and decoded token-weight pairs
+    def create_embedding(self, embedding_input: EmbeddingInput) -> Embedding:
+        """Create sparse vector and decoded token weight embeddings for an input text.
 
         Args:
-            input_record: The input containing text to embed
+            embedding_input: EmbeddingInput object with a .text attribute
         """
         # generate the sparse embeddings
-        sparse_vector, decoded_tokens = self._encode_documents([input_record.text])[0]
+        sparse_vector, decoded_tokens = self._encode_documents([embedding_input.text])[0]
 
         # coerce sparse vector tensor into list[float]
         sparse_vector_list = sparse_vector.cpu().numpy().tolist()
 
         return Embedding(
-            timdex_record_id=input_record.timdex_record_id,
-            run_id=input_record.run_id,
-            run_record_offset=input_record.run_record_offset,
+            timdex_record_id=embedding_input.timdex_record_id,
+            run_id=embedding_input.run_id,
+            run_record_offset=embedding_input.run_record_offset,
             model_uri=self.model_uri,
-            embedding_strategy=input_record.embedding_strategy,
+            embedding_strategy=embedding_input.embedding_strategy,
             embedding_vector=sparse_vector_list,
             embedding_token_weights=decoded_tokens,
         )
@@ -212,53 +204,32 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
         This follows the pattern outlined on the HuggingFace model card for document
         encoding.
 
-        This method will accommodate a list of text inputs, and return a list of
-        embeddings, but the calling base method create_embeddings() is a singular input +
+        This method will accommodate MULTIPLE text inputs, and return a list of
+        embeddings, but the calling context of create_embedding() is a SINGULAR input +
         output.  This method keeps the ability to handle multiple inputs + outputs, in the
-        event we want something like a create_multiple_embeddings() method in the future.
+        event we want something like a create_multiple_embeddings() method in the future,
+        but only returns a single result.
 
-        The following is a rough approximation of receiving logits back from the model
-        and converting this to a sparse vector which can then be decoded to token:weights:
+        At a very high level, the following is performed:
 
-        ----------------------------------------------------------------------------------
-        Imagine your vocabulary is just 5 words: ["cat", "dog", "bird", "fish", "tree"]
-        Vocabulary indices:                      [  0,     1,      2,      3,       4]
+        1. We tokenize the input text into "features" using the model's tokenizer.
 
-        1. MODEL RETURNS LOGITS
-        Let's say you input the text: "cat and dog"
-        After tokenization, you have 3 tokens at 3 sequence positions
-        The model outputs logits - a score for EVERY vocab word at EVERY position:
+        2. The features are fed to the model returning model output logits. These logits
+        are "dense" in the sense there are few zeros, but they are not "dense vectors"
+        (embeddings) in the sense that they meaningfully represent the input document in
+        geometric space; two logit tensors cannot be compared with something like cosine
+        similarity.
 
-        logits = [
-            # Position 0 (word "cat"):  scores for each vocab word at this position
-            [9.2,  1.1,  0.3,  0.5,  0.2],  # "cat" gets high score (9.2)
+        3. The logits are then converted into a sparse vector, which is a numeric
+        array of floats with the same number of values as the model's vocabulary. Each
+        value's position in the sparse array corresponds to the token id in the
+        vocabulary, and the value itself is the "weight" of this token in the input text.
 
-            # Position 1 (word "and" - not in our toy vocab, but tokenized somehow):
-            [2.1,  1.8,  0.4,  0.3,  0.9],  # moderate scores everywhere
-
-            # Position 2 (word "dog"):
-            [0.8,  8.7,  0.2,  0.4,  0.1],  # "dog" gets high score (8.7)
-        ]
-        Shape: (3 positions, 5 vocab words)
-
-
-        2. PRODUCE SPARSE VECTORS FROM LOGITS
-        We collapse the sequence positions by taking the MAX score for each vocab word:
-
-        sparse_vector = [
-            max(9.2, 2.1, 0.8),  # "cat": take max across all 3 positions = 9.2
-            max(1.1, 1.8, 8.7),  # "dog": take max = 8.7
-            max(0.3, 0.4, 0.2),  # "bird": take max = 0.4
-            max(0.5, 0.3, 0.4),  # "fish": take max = 0.5
-            max(0.2, 0.9, 0.1),  # "tree": take max = 0.9
-        ]
-
-        Apply transformations (ReLU, double-log) to make it sparser:
-        sparse_vector = [5.1, 4.8, 0.0, 0.0, 0.0]  # smaller values become 0
-
-        Final result:
-        {"cat": 5.1, "dog": 4.8}  # Only the relevant words have non-zero weights
-        ----------------------------------------------------------------------------------
+        4. Lastly, we convert this sparse vector into a {token:weight} dictionary of the
+        actual token strings and their numerical weight. This dictionary may contain
+        tokens not present in the original text, but will be considerably shorter than
+        the model vocabulary length given all zero and low scoring tokens are dropped.
+        This is the final form that we will ultimately index into OpenSearch.
 
         Args:
             texts: list of strings to create embeddings for
@@ -278,14 +249,14 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
         # move to CPU or GPU device, depending on what's available
         features = {k: v.to(self._device) for k, v in features.items()}
 
-        # get model logits output
+        # pass features to the model and receive model output logits as a tensor
         with torch.no_grad():
             output = self._model(**features)[0]
 
-        # generate sparse vectors from model logits
+        # generate sparse vectors from model logits tensor
         sparse_vectors = self._get_sparse_vectors(features, output)
 
-        # decode to token-weight dictionaries
+        # decode sparse vectors to token-weight dictionaries
         decoded = self._decode_sparse_vectors(sparse_vectors)
 
         # return list of tuple(vector, decoded token weights) embedding results
@@ -304,6 +275,10 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             2. log(1 + log(1 + relu())) transformation
             3. Zero out special tokens
 
+        The end resul is a sparse vector with a length of the model vocabulary, with each
+        position representing a token in the model vocabulary and each value representing
+        that token's weight relative to the input text.
+
         Args:
             features: Tokenizer output with attention_mask
             output: Model logits of shape (batch_size, seq_len, vocab_size)
@@ -311,13 +286,15 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
         Returns:
             Sparse vectors of shape (batch_size, vocab_size)
         """
-        # max pooling with attention mask
+        # collapse sequence positions: take max logit for each vocab token across all
+        # positions (also masks out padding tokens)
         values, _ = torch.max(output * features["attention_mask"].unsqueeze(-1), dim=1)
 
-        # apply the v3 model activation
+        # compress values to create sparsity: ReLU removes negatives,
+        # double-log shrinks large values
         values = torch.log(1 + torch.log(1 + torch.relu(values)))
 
-        # zero out special tokens
+        # remove special tokens like [CLS], [SEP], [PAD]
         values[:, self._special_token_ids] = 0
 
         return values

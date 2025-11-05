@@ -293,7 +293,7 @@ def test_load_sets_up_special_token_ids(
 def test_create_embedding_raises_error_if_model_not_loaded(tmp_path):
     """Test create_embedding raises RuntimeError if model not loaded."""
     model = OSNeuralSparseDocV3GTE(tmp_path / "model")
-    input_record = EmbeddingInput(
+    embedding_input = EmbeddingInput(
         timdex_record_id="test:123",
         run_id="run-456",
         run_record_offset=0,
@@ -302,7 +302,7 @@ def test_create_embedding_raises_error_if_model_not_loaded(tmp_path):
     )
 
     with pytest.raises(RuntimeError, match="Model not loaded"):
-        model.create_embedding(input_record)
+        model.create_embedding(embedding_input)
 
 
 def test_create_embedding_returns_embedding_object(tmp_path, monkeypatch):
@@ -317,7 +317,7 @@ def test_create_embedding_returns_embedding_object(tmp_path, monkeypatch):
 
     monkeypatch.setattr(model, "_encode_documents", mock_encode_documents)
 
-    input_record = EmbeddingInput(
+    embedding_input = EmbeddingInput(
         timdex_record_id="test:123",
         run_id="run-456",
         run_record_offset=42,
@@ -325,7 +325,7 @@ def test_create_embedding_returns_embedding_object(tmp_path, monkeypatch):
         text="test document",
     )
 
-    embedding = model.create_embedding(input_record)
+    embedding = model.create_embedding(embedding_input)
 
     assert embedding.timdex_record_id == "test:123"
     assert embedding.run_id == "run-456"

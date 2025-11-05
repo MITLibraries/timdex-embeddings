@@ -45,12 +45,12 @@ class MockEmbeddingModel(BaseEmbeddingModel):
     def load(self) -> None:
         logger.info("Model loaded successfully, 1.5s")
 
-    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
+    def create_embedding(self, embedding_input: EmbeddingInput) -> Embedding:
         return Embedding(
-            timdex_record_id=input_record.timdex_record_id,
-            run_id=input_record.run_id,
-            run_record_offset=input_record.run_record_offset,
-            embedding_strategy=input_record.embedding_strategy,
+            timdex_record_id=embedding_input.timdex_record_id,
+            run_id=embedding_input.run_id,
+            run_record_offset=embedding_input.run_record_offset,
+            embedding_strategy=embedding_input.embedding_strategy,
             model_uri=self.model_uri,
             embedding_vector=[0.1, 0.2, 0.3],
             embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
