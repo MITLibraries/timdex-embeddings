@@ -275,7 +275,7 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             2. log(1 + log(1 + relu())) transformation
             3. Zero out special tokens
 
-        The end resul is a sparse vector with a length of the model vocabulary, with each
+        The end result is a sparse vector with a length of the model vocabulary, with each
         position representing a token in the model vocabulary and each value representing
         that token's weight relative to the input text.
 
