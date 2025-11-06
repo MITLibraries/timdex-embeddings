@@ -23,6 +23,12 @@ class EmbeddingInput:
     embedding_strategy: str
     text: str
 
+    def __repr__(self) -> str:  # noqa: D105
+        return (
+            f"<EmbeddingInput - record:'{self.timdex_record_id}', "
+            f"strategy:'{self.embedding_strategy}', text length:{len(self.text)}>"
+        )
+
 
 @dataclass
 class Embedding:
@@ -48,6 +54,12 @@ class Embedding:
     timestamp: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
+
+    def __repr__(self) -> str:  # noqa: D105
+        return (
+            f"<Embedding - record:'{self.timdex_record_id}', "
+            f"strategy:'{self.embedding_strategy}'>"
+        )
 
     def to_dict(self) -> dict:
         """Marshal to dictionary."""

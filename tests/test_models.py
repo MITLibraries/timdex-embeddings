@@ -35,14 +35,14 @@ def test_mock_model_load(caplog, mock_model):
 
 
 def test_mock_model_create_embedding(mock_model):
-    input_record = EmbeddingInput(
+    embedding_input = EmbeddingInput(
         timdex_record_id="test-id",
         run_id="test-run",
         run_record_offset=42,
         embedding_strategy="full_record",
         text="test text",
     )
-    embedding = mock_model.create_embedding(input_record)
+    embedding = mock_model.create_embedding(embedding_input)
 
     assert embedding.timdex_record_id == "test-id"
     assert embedding.run_id == "test-run"
@@ -87,7 +87,7 @@ def test_subclass_with_non_string_model_uri_raises_type_error():
 
 
 def test_base_model_create_embeddings_calls_create_embedding(mock_model):
-    input_records = [
+    embedding_inputs = [
         EmbeddingInput(
             timdex_record_id="id-1",
             run_id="run-1",
@@ -105,7 +105,7 @@ def test_base_model_create_embeddings_calls_create_embedding(mock_model):
     ]
 
     # create_embeddings should iterate and call create_embedding
-    embeddings = list(mock_model.create_embeddings(iter(input_records)))
+    embeddings = list(mock_model.create_embeddings(iter(embedding_inputs)))
 
     assert len(embeddings) == 2  # two input records
     assert embeddings[0].timdex_record_id == "id-1"

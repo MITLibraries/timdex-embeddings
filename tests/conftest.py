@@ -45,12 +45,12 @@ class MockEmbeddingModel(BaseEmbeddingModel):
     def load(self) -> None:
         logger.info("Model loaded successfully, 1.5s")
 
-    def create_embedding(self, input_record: EmbeddingInput) -> Embedding:
+    def create_embedding(self, embedding_input: EmbeddingInput) -> Embedding:
         return Embedding(
-            timdex_record_id=input_record.timdex_record_id,
-            run_id=input_record.run_id,
-            run_record_offset=input_record.run_record_offset,
-            embedding_strategy=input_record.embedding_strategy,
+            timdex_record_id=embedding_input.timdex_record_id,
+            run_id=embedding_input.run_id,
+            run_record_offset=embedding_input.run_record_offset,
+            embedding_strategy=embedding_input.embedding_strategy,
             model_uri=self.model_uri,
             embedding_vector=[0.1, 0.2, 0.3],
             embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
@@ -71,35 +71,7 @@ def register_mock_model(monkeypatch):
 
 
 @pytest.fixture
-def neural_sparse_doc_v3_gte_fake_model_directory(tmp_path):
-    """Create a fake downloaded model directory with required files."""
-    model_dir = tmp_path / "fake_model"
-    model_dir.mkdir()
-
-    # create config.json
-    config_json = {
-        "model_type": "distilbert",
-        "vocab_size": 30000,
-        "auto_map": {
-            "AutoConfig": "Alibaba-NLP/new-impl--configuration.NewConfig",
-            "AutoModel": "Alibaba-NLP/new-impl--modeling.NewModel",
-        },
-    }
-    (model_dir / "config.json").write_text(json.dumps(config_json))
-
-    # create modeling.py and configuration.py
-    (model_dir / "modeling.py").write_text("# mock modeling code")
-    (model_dir / "configuration.py").write_text("# mock configuration code")
-
-    # create tokenizer files
-    (model_dir / "tokenizer.json").write_text('{"version": "1.0"}')
-    (model_dir / "vocab.txt").write_text("word1\nword2\n")
-
-    return model_dir
-
-
-@pytest.fixture
-def neural_sparse_doc_v3_gte_mock_huggingface_snapshot(monkeypatch, tmp_path):
+def mock_snapshot_download(monkeypatch, tmp_path):
     """Mock snapshot_download to create fake model files locally."""
 
     def mock_snapshot(repo_id, local_dir, **kwargs):
@@ -132,53 +104,3 @@ def neural_sparse_doc_v3_gte_mock_huggingface_snapshot(monkeypatch, tmp_path):
         "embeddings.models.os_neural_sparse_doc_v3_gte.snapshot_download", mock_snapshot
     )
     return mock_snapshot
-
-
-@pytest.fixture
-def neural_sparse_doc_v3_gte_mock_transformers_models(monkeypatch):
-    """Mock AutoModelForMaskedLM and AutoTokenizer."""
-
-    class MockTokenizer:
-        """Mock tokenizer with necessary attributes."""
-
-        def __init__(self, *args, **kwargs):  # noqa: ARG002
-            self.vocab = {
-                "[CLS]": 0,
-                "[SEP]": 1,
-                "[PAD]": 2,
-                "word1": 3,
-                "word2": 4,
-            }
-            self.vocab_size = len(self.vocab)
-            self.special_tokens_map = {
-                "cls_token": "[CLS]",
-                "sep_token": "[SEP]",
-                "pad_token": "[PAD]",
-            }
-
-    class MockModel:
-        """Mock model with necessary attributes."""
-
-        def __init__(self, *args, **kwargs):  # noqa: ARG002
-            self.config = {"vocab_size": 30000}
-
-    class MockAutoTokenizer:
-        @staticmethod
-        def from_pretrained(*args, **kwargs):  # noqa: ARG004
-            return MockTokenizer()
-
-    class MockAutoModelForMaskedLM:
-        @staticmethod
-        def from_pretrained(*args, **kwargs):  # noqa: ARG004
-            return MockModel()
-
-    monkeypatch.setattr(
-        "embeddings.models.os_neural_sparse_doc_v3_gte.AutoTokenizer",
-        MockAutoTokenizer,
-    )
-    monkeypatch.setattr(
-        "embeddings.models.os_neural_sparse_doc_v3_gte.AutoModelForMaskedLM",
-        MockAutoModelForMaskedLM,
-    )
-
-    return {"tokenizer": MockTokenizer, "model": MockModel}

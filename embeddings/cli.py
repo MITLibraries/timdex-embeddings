@@ -210,6 +210,7 @@ def create_embeddings(
 ) -> None:
     """Create embeddings for TIMDEX records."""
     model: BaseEmbeddingModel = ctx.obj["model"]
+    model.load()
 
     # init TIMDEXDataset
     timdex_dataset = TIMDEXDataset(dataset_location)
@@ -229,10 +230,10 @@ def create_embeddings(
     )
 
     # create an iterator of EmbeddingInputs applying all requested strategies
-    input_records = create_embedding_inputs(timdex_records, list(strategy))
+    embedding_inputs = create_embedding_inputs(timdex_records, list(strategy))
 
     # create embeddings via the embedding model
-    embeddings = model.create_embeddings(input_records)
+    embeddings = model.create_embeddings(embedding_inputs)
 
     # if requested, write embeddings to a local JSONLines file
     if output_jsonl:
