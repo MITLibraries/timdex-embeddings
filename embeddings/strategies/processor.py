@@ -33,7 +33,12 @@ def create_embedding_inputs(
     for timdex_dataset_record in timdex_dataset_records:
 
         # decode and parse the TIMDEX JSON record once for all requested strategies
-        timdex_record = json.loads(timdex_dataset_record["transformed_record"].decode())
+        transformed_record_raw = timdex_dataset_record["transformed_record"]
+        timdex_record = json.loads(
+            transformed_record_raw.decode()
+            if isinstance(transformed_record_raw, bytes)
+            else transformed_record_raw
+        )
 
         for transformer in transformers:
             # prepare text for embedding from transformer strategy

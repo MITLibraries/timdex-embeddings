@@ -12,6 +12,7 @@ dependencies = [
     "huggingface-hub>=0.26.0",
     "jsonlines>=4.0.0",
     "sentry-sdk>=2.34.1",
+    "smart-open[s3]>=7.4.4",
     "timdex-dataset-api",
     "torch>=2.9.0",
     "transformers>=4.57.1",
@@ -41,7 +42,10 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["timdex_dataset_api.*"]
+module = [
+    "timdex_dataset_api.*",
+    "smart_open.*",
+]
 follow_untyped_imports = true
 
 
