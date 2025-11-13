@@ -12,11 +12,14 @@ WORKDIR /app
 # Copy project metadata
 COPY pyproject.toml uv.lock* ./
 
+# Install package into system python
+RUN uv pip install --system .
+
 # Copy CLI application
 COPY embeddings ./embeddings
 
-# Install package into system python
-RUN uv pip install --system .
+# Copy fixtures
+COPY tests/fixtures /fixtures
 
 # Download the model and include in the Docker image
 # NOTE: The env vars "TE_MODEL_URI" and "TE_MODEL_PATH" are set here to support

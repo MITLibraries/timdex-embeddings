@@ -1,6 +1,7 @@
 import json
 import logging
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,12 @@ class MockEmbeddingModel(BaseEmbeddingModel):
             embedding_vector=[0.1, 0.2, 0.3],
             embedding_token_weights={"coffee": 0.9, "seattle": 0.5},
         )
+
+    def create_embeddings(
+        self, embedding_inputs: Iterator[EmbeddingInput]
+    ) -> Iterator[Embedding]:
+        for embedding_input in embedding_inputs:
+            yield self.create_embedding(embedding_input)
 
 
 @pytest.fixture

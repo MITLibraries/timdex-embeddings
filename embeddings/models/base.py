@@ -58,13 +58,12 @@ class BaseEmbeddingModel(ABC):
             embedding_input: EmbeddingInput instance
         """
 
+    @abstractmethod
     def create_embeddings(
         self, embedding_inputs: Iterator[EmbeddingInput]
     ) -> Iterator[Embedding]:
-        """Yield Embeddings for a batch of EmbeddingInputs.
+        """Yield Embeddings for multiple EmbeddingInputs.
 
         Args:
             embedding_inputs: iterator of EmbeddingInputs
         """
-        for embedding_input in embedding_inputs:
-            yield self.create_embedding(embedding_input)

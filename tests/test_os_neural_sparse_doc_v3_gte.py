@@ -18,7 +18,6 @@ def os_neural_sparse_model_path(tmp_path):
     model_dir = tmp_path / "fake_model"
     model_dir.mkdir()
 
-    # create config.json
     config_json = {
         "model_type": "distilbert",
         "vocab_size": 30000,
@@ -28,96 +27,31 @@ def os_neural_sparse_model_path(tmp_path):
         },
     }
     (model_dir / "config.json").write_text(json.dumps(config_json))
-
-    # create modeling.py and configuration.py
     (model_dir / "modeling.py").write_text("# mock modeling code")
     (model_dir / "configuration.py").write_text("# mock configuration code")
-
-    # create tokenizer files
     (model_dir / "tokenizer.json").write_text('{"version": "1.0"}')
-    (model_dir / "vocab.txt").write_text("word1\nword2\n")
-
     return model_dir
 
 
-@pytest.fixture
-def mock_os_neural_sparse_transformers(monkeypatch):
-    """Mock AutoTokenizer and AutoModelForMaskedLM for OSNeuralSparseDocV3GTE."""
+class DummySparseEncoder:
+    """Lightweight stand-in for sentence-transformers SparseEncoder."""
 
-    class MockTokenizer:
-        """Mock tokenizer with necessary attributes."""
+    def __init__(self, document_vectors: list[torch.Tensor] | None = None) -> None:
+        self.document_vectors = document_vectors or []
 
-        def __init__(self, *args, **kwargs):  # noqa: ARG002
-            self.vocab = {
-                "[CLS]": 0,
-                "[SEP]": 1,
-                "[PAD]": 2,
-                "coffee": 3,
-                "mountain": 4,
-                "seattle": 5,
-            }
-            self.vocab_size = len(self.vocab)
-            self.special_tokens_map = {
-                "cls_token": "[CLS]",
-                "sep_token": "[SEP]",
-                "pad_token": "[PAD]",
-            }
-            self.id_to_token = {v: k for k, v in self.vocab.items()}
+    def encode_document(self, texts, **kwargs):  # noqa: ARG002
+        if isinstance(texts, list):
+            if self.document_vectors:
+                return self.document_vectors
+            return [torch.tensor([float(i), float(i) + 0.1]) for i in range(len(texts))]
+        return torch.tensor([0.1, 0.2])
 
-        def convert_ids_to_tokens(self, token_ids):
-            """Convert token IDs to token strings."""
-            if isinstance(token_ids, int):
-                return self.id_to_token.get(token_ids)
-            return [self.id_to_token.get(tid) for tid in token_ids]
+    def decode(self, tensor):
+        value = float(torch.sum(tensor).item())
+        return [("sum", value)]
 
-    class MockModel:
-        """Mock model with necessary attributes."""
-
-        def __init__(self, *args, **kwargs):  # noqa: ARG002
-            self.config = {"vocab_size": 30000}
-
-        def to(self, device):  # noqa: ARG002
-            """Mock device placement."""
-            return self
-
-        def eval(self):
-            """Mock evaluation mode."""
-            return self
-
-    class MockAutoTokenizer:
-        @staticmethod
-        def from_pretrained(*args, **kwargs):  # noqa: ARG004
-            return MockTokenizer()
-
-    class MockAutoModelForMaskedLM:
-        @staticmethod
-        def from_pretrained(*args, **kwargs):  # noqa: ARG004
-            return MockModel()
-
-    monkeypatch.setattr(
-        "embeddings.models.os_neural_sparse_doc_v3_gte.AutoTokenizer",
-        MockAutoTokenizer,
-    )
-    monkeypatch.setattr(
-        "embeddings.models.os_neural_sparse_doc_v3_gte.AutoModelForMaskedLM",
-        MockAutoModelForMaskedLM,
-    )
-
-
-@pytest.fixture
-def loaded_model(os_neural_sparse_model_path, mock_os_neural_sparse_transformers):
-    """Fixture providing a loaded OSNeuralSparseDocV3GTE instance."""
-    model = OSNeuralSparseDocV3GTE(os_neural_sparse_model_path)
-    model.load()
-    return model
-
-
-def test_init(tmp_path):
-    """Test model initialization."""
-    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
-    assert model._model is None
-    assert model._tokenizer is None
-    assert model._special_token_ids is None
+    def start_multi_process_pool(self, devices):
+        return devices
 
 
 def test_model_uri(tmp_path):
@@ -125,10 +59,6 @@ def test_model_uri(tmp_path):
     model = OSNeuralSparseDocV3GTE(tmp_path / "model")
     assert (
         model.model_uri
-        == "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte"
-    )
-    assert (
-        model.MODEL_URI
         == "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte"
     )
 
@@ -235,87 +165,42 @@ def test_patch_updates_config_json(mock_snapshot_download, tmp_path):
     assert updated_config["auto_map"]["AutoModelForMaskedLM"] == "modeling.NewForMaskedLM"
 
 
-def test_load_success(
-    os_neural_sparse_model_path,
-    mock_os_neural_sparse_transformers,
-):
-    """Test successful load from local path."""
-    model = OSNeuralSparseDocV3GTE(os_neural_sparse_model_path)
+def test_load_success(monkeypatch, os_neural_sparse_model_path):
+    """Test successful load from local path assigns SparseEncoder."""
+    sentinel = object()
+    captured_kwargs = {}
 
+    def fake_sparse_encoder(*args, **kwargs):
+        captured_kwargs["args"] = args
+        captured_kwargs["kwargs"] = kwargs
+        return sentinel
+
+    monkeypatch.setattr(
+        "embeddings.models.os_neural_sparse_doc_v3_gte.SparseEncoder",
+        fake_sparse_encoder,
+    )
+
+    model = OSNeuralSparseDocV3GTE(os_neural_sparse_model_path)
     model.load()
 
-    assert model._model is not None
-    assert model._tokenizer is not None
+    assert model._model is sentinel
+    assert captured_kwargs["args"][0] == str(os_neural_sparse_model_path)
+    assert captured_kwargs["kwargs"]["trust_remote_code"] is True
 
 
-def test_load_file_not_found():
+def test_load_file_not_found(tmp_path):
     """Test load raises FileNotFoundError for missing path."""
-    nonexistent_path = Path("/nonexistent/path")
-    model = OSNeuralSparseDocV3GTE(nonexistent_path)
+    path = tmp_path / "missing"
+    model = OSNeuralSparseDocV3GTE(path)
 
     with pytest.raises(FileNotFoundError, match="Model not found at path"):
         model.load()
 
 
-def test_load_initializes_model_and_tokenizer(
-    os_neural_sparse_model_path,
-    mock_os_neural_sparse_transformers,
-):
-    """Test load initializes _model and _tokenizer attributes."""
-    model = OSNeuralSparseDocV3GTE(os_neural_sparse_model_path)
-
-    assert model._model is None
-    assert model._tokenizer is None
-
-    model.load()
-
-    assert model._model is not None
-    assert model._tokenizer is not None
-
-
-def test_load_sets_up_special_token_ids(
-    os_neural_sparse_model_path,
-    mock_os_neural_sparse_transformers,
-):
-    """Test load sets up _special_token_ids list."""
-    model = OSNeuralSparseDocV3GTE(os_neural_sparse_model_path)
-
-    model.load()
-
-    assert model._special_token_ids is not None
-    assert isinstance(model._special_token_ids, list)
-    assert len(model._special_token_ids) == 3  # CLS, SEP, PAD
-    assert 0 in model._special_token_ids  # [CLS] token id
-    assert 1 in model._special_token_ids  # [SEP] token id
-    assert 2 in model._special_token_ids  # [PAD] token id
-
-
-def test_create_embedding_raises_error_if_model_not_loaded(tmp_path):
-    """Test create_embedding raises RuntimeError if model not loaded."""
-    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
-    embedding_input = EmbeddingInput(
-        timdex_record_id="test:123",
-        run_id="run-456",
-        run_record_offset=0,
-        embedding_strategy="title_only",
-        text="test document",
-    )
-
-    with pytest.raises(RuntimeError, match="Model not loaded"):
-        model.create_embedding(embedding_input)
-
-
-def test_create_embedding_returns_embedding_object(tmp_path, monkeypatch):
+def test_create_embedding_returns_embedding_object(tmp_path):
     """Test create_embedding returns an Embedding object with correct attributes."""
     model = OSNeuralSparseDocV3GTE(tmp_path / "model")
-
-    # mock _encode_documents
-    def mock_encode_documents(texts):
-        sparse_vector = torch.tensor([0.0, 0.0, 0.0, 0.91, 0.73])
-        decoded_tokens = {"coffee": 0.91, "mountain": 0.73}
-        return [(sparse_vector, decoded_tokens)]
-
-    monkeypatch.setattr(model, "_encode_documents", mock_encode_documents)
+    model._model = DummySparseEncoder()
 
     embedding_input = EmbeddingInput(
         timdex_record_id="test:123",
@@ -332,27 +217,46 @@ def test_create_embedding_returns_embedding_object(tmp_path, monkeypatch):
     assert embedding.run_record_offset == 42
     assert embedding.model_uri == model.model_uri
     assert embedding.embedding_strategy == "title_only"
-    assert isinstance(embedding.embedding_vector, list)
-    assert embedding.embedding_vector == pytest.approx([0.0, 0.0, 0.0, 0.91, 0.73])
-    assert embedding.embedding_token_weights == {"coffee": 0.91, "mountain": 0.73}
+    assert embedding.embedding_vector == pytest.approx([0.1, 0.2])
+    assert embedding.embedding_token_weights == {"sum": pytest.approx(0.3)}
 
 
-def test_decode_sparse_vectors_converts_to_token_weights(loaded_model):
-    """Test _decode_sparse_vectors converts sparse vector to token-weight dict."""
-    # sparse vector with weights for "coffee" (index 3) and "mountain" (index 4)
-    sparse_vector = torch.tensor([0.0, 0.0, 0.0, 0.85, 0.62, 0.0])
+def test_create_embeddings_consumes_iterator_and_returns_embeddings(
+    tmp_path, monkeypatch
+):
+    """Test create_embeddings yields Embeddings for generator inputs."""
+    model = OSNeuralSparseDocV3GTE(tmp_path / "model")
+    dummy_encoder = DummySparseEncoder(
+        document_vectors=[
+            torch.tensor([0.1, 0.2]),
+            torch.tensor([0.3, 0.4]),
+        ]
+    )
+    model._model = dummy_encoder
+    monkeypatch.delenv("TE_NUM_WORKERS", raising=False)
+    monkeypatch.delenv("TE_BATCH_SIZE", raising=False)
 
-    result = loaded_model._decode_sparse_vectors(sparse_vector)
+    embedding_inputs = [
+        EmbeddingInput(
+            timdex_record_id="id-1",
+            run_id="run-1",
+            run_record_offset=0,
+            embedding_strategy="strategy-1",
+            text="text 1",
+        ),
+        EmbeddingInput(
+            timdex_record_id="id-2",
+            run_id="run-1",
+            run_record_offset=1,
+            embedding_strategy="strategy-1",
+            text="text 2",
+        ),
+    ]
 
-    assert len(result) == 1
-    assert result[0] == {"coffee": pytest.approx(0.85), "mountain": pytest.approx(0.62)}
+    embeddings = list(model.create_embeddings(iter(embedding_inputs)))
 
-
-def test_decode_sparse_vectors_with_empty_vector(loaded_model):
-    """Test _decode_sparse_vectors returns empty dict for all-zero vector."""
-    sparse_vector = torch.tensor([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-
-    result = loaded_model._decode_sparse_vectors(sparse_vector)
-
-    assert len(result) == 1
-    assert result[0] == {}
+    assert len(embeddings) == 2
+    assert embeddings[0].timdex_record_id == "id-1"
+    assert embeddings[0].embedding_vector == pytest.approx([0.1, 0.2])
+    assert embeddings[1].timdex_record_id == "id-2"
+    assert embeddings[1].embedding_vector == pytest.approx([0.3, 0.4])

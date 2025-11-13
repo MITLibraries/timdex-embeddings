@@ -84,29 +84,3 @@ def test_subclass_with_non_string_model_uri_raises_type_error():
 
         class InvalidModel(BaseEmbeddingModel):
             MODEL_URI = 123
-
-
-def test_base_model_create_embeddings_calls_create_embedding(mock_model):
-    embedding_inputs = [
-        EmbeddingInput(
-            timdex_record_id="id-1",
-            run_id="run-1",
-            run_record_offset=0,
-            embedding_strategy="full_record",
-            text="text 1",
-        ),
-        EmbeddingInput(
-            timdex_record_id="id-2",
-            run_id="run-1",
-            run_record_offset=1,
-            embedding_strategy="full_record",
-            text="text 2",
-        ),
-    ]
-
-    # create_embeddings should iterate and call create_embedding
-    embeddings = list(mock_model.create_embeddings(iter(embedding_inputs)))
-
-    assert len(embeddings) == 2  # two input records
-    assert embeddings[0].timdex_record_id == "id-1"
-    assert embeddings[1].timdex_record_id == "id-2"
