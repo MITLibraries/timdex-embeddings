@@ -247,8 +247,11 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
         decoded_token_weights = cast("list[tuple[str, float]]", decoded_token_weights)
         embedding_token_weights = dict(decoded_token_weights)
 
-        # prepare sparse vector for JSON serialization
-        embedding_vector = sparse_vector.to_dense().tolist()
+        # # prepare sparse vector for JSON serialization
+        # NOTE: at this time we are NOT including the sparse vector for output.  This
+        #   block can be uncommented in the future to include it when wanted.
+        # embedding_vector = sparse_vector.to_dense().tolist() # noqa: ERA001
+        embedding_vector = None
 
         return Embedding(
             timdex_record_id=embedding_input.timdex_record_id,
