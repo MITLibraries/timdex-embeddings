@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from embeddings.strategies.base import BaseStrategy
@@ -14,7 +12,7 @@ def test_full_record_strategy_extracts_text():
 
     text = strategy.extract_text(timdex_record)
 
-    assert text == json.dumps(timdex_record)
+    assert text == """timdex_record_id: "test-123"\ntitle: ["Test Title"]\n"""
     assert strategy.STRATEGY_NAME == "full_record"
 
 

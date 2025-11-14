@@ -217,7 +217,7 @@ def test_create_embedding_returns_embedding_object(tmp_path):
     assert embedding.run_record_offset == 42
     assert embedding.model_uri == model.model_uri
     assert embedding.embedding_strategy == "title_only"
-    assert embedding.embedding_vector == pytest.approx([0.1, 0.2])
+    assert embedding.embedding_vector is None
     assert embedding.embedding_token_weights == {"sum": pytest.approx(0.3)}
 
 
@@ -257,6 +257,6 @@ def test_create_embeddings_consumes_iterator_and_returns_embeddings(
 
     assert len(embeddings) == 2
     assert embeddings[0].timdex_record_id == "id-1"
-    assert embeddings[0].embedding_vector == pytest.approx([0.1, 0.2])
+    assert embeddings[0].embedding_vector is None
     assert embeddings[1].timdex_record_id == "id-2"
-    assert embeddings[1].embedding_vector == pytest.approx([0.3, 0.4])
+    assert embeddings[1].embedding_vector is None

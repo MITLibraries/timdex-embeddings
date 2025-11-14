@@ -48,8 +48,8 @@ class Embedding:
     run_record_offset: int
     model_uri: str
     embedding_strategy: str
-    embedding_vector: list[float]
-    embedding_token_weights: dict
+    embedding_vector: list[float] | None
+    embedding_token_weights: dict | None
 
     timestamp: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC)

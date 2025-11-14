@@ -26,6 +26,13 @@ WORKSPACE=### Set to `dev` for local development, this will be set to `stage` an
 TE_MODEL_URI=# HuggingFace model URI
 TE_MODEL_PATH=# Path where the model will be downloaded to and loaded from
 HF_HUB_DISABLE_PROGRESS_BARS=#boolean to use progress bars for HuggingFace model downloads; defaults to 'true' in deployed contexts
+# inference performance tuning
+TE_TORCH_DEVICE=# defaults to 'cpu', but can be set to 'mps' for Apple Silicon, or theoretically 'cuda' for GPUs
+TE_BATCH_SIZE=# batch size for each inference worker, defaults to 32
+TE_NUM_WORKERS=# number of parallel model inference workers, defaults to 1
+TE_CHUNK_SIZE=# number of batches each parallel worker grabs; no effect if TE_NUM_WORKERS=1
+OMP_NUM_THREADS=# torch env var that sets thread usage during inference, default is not setting and using torch defaults
+MKL_NUM_THREADS=# torch env var that sets thread usage during inference, default is not setting and using torch defaults
 ```
 
 ## Configuring an Embedding Model
@@ -106,14 +113,15 @@ Options:
                                [required]
   --model-path PATH            Path where the model will be downloaded to and
                                loaded from, e.g. '/path/to/model'.  [required]
-  -d, --dataset-location PATH  TIMDEX dataset location, e.g.
+  --dataset-location PATH      TIMDEX dataset location, e.g.
                                's3://timdex/dataset', to read records from.
-                               [required]
-  --run-id TEXT                TIMDEX ETL run id.  [required]
+  --run-id TEXT                TIMDEX ETL run id.
   --run-record-offset INTEGER  TIMDEX ETL run record offset to start from,
-                               default = 0.  [required]
+                               default = 0.
   --record-limit INTEGER       Limit number of records after --run-record-
-                               offset, default = None (unlimited).  [required]
+                               offset, default = None (unlimited).
+  --input-jsonl TEXT           Optional filepath to JSONLines file containing
+                               TIMDEX records to create embeddings from.
   --strategy [full_record]     Pre-embedding record transformation strategy.
                                Repeatable to apply multiple strategies.
                                [required]
