@@ -191,11 +191,11 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
 
         # read env vars for configurations
         num_workers = int(os.getenv("TE_NUM_WORKERS", "1"))
-        batch_size = int(
-            os.getenv("TE_BATCH_SIZE", "32")
-        )  # sentence-transformers default
+        batch_size = int(os.getenv("TE_BATCH_SIZE", "32"))
+        chunk_size_env = os.getenv("TE_CHUNK_SIZE")
+        chunk_size = int(chunk_size_env) if chunk_size_env else None
 
-        # configure device and worker pool based on number of workers requested
+        # configure for inference
         if num_workers > 1 or self.device == "mps":
             device = None
             pool = self._model.start_multi_process_pool(
@@ -206,17 +206,20 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             pool = None
         logger.info(
             f"Num workers: {num_workers}, batch size: {batch_size}, "
-            f"device: {device}, pool: {pool}"
+            f"chunk size: {chunk_size, }device: {device}, pool: {pool}"
         )
 
         # get sparse vector embedding for input text(s)
+        inference_start = time.perf_counter()
         sparse_vectors = self._model.encode_document(
             texts,
             batch_size=batch_size,
             device=device,
             pool=pool,
             save_to_cpu=True,
+            chunk_size=chunk_size,
         )
+        logger.info(f"Inference elapsed: {time.perf_counter()-inference_start}s")
         sparse_vectors = cast("list[Tensor]", sparse_vectors)
 
         for i, embedding_input in enumerate(embedding_inputs_list):
