@@ -2,7 +2,7 @@ import functools
 import json
 import logging
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from datetime import timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -10,9 +10,10 @@ from typing import TYPE_CHECKING
 import click
 import jsonlines
 import smart_open
-from timdex_dataset_api import TIMDEXDataset
+from timdex_dataset_api import DatasetEmbedding, TIMDEXDataset, TIMDEXEmbeddings
 
 from embeddings.config import configure_logger, configure_sentry
+from embeddings.models.base import Embedding
 from embeddings.models.registry import get_model_class
 from embeddings.strategies.processor import create_embedding_inputs
 from embeddings.strategies.registry import STRATEGY_REGISTRY
@@ -222,6 +223,7 @@ def create_embeddings(
     """Create embeddings for TIMDEX records."""
     model: BaseEmbeddingModel = ctx.obj["model"]
     model.load()
+    timdex_dataset: TIMDEXDataset | None = None
 
     # read input records from TIMDEX dataset (default) or a JSONLines file
     if input_jsonl:
@@ -230,7 +232,6 @@ def create_embeddings(
             jsonlines.Reader(file_obj) as reader,
         ):
             timdex_records = iter(list(reader))
-
     else:
         if not dataset_location or not run_id:
             raise click.UsageError(
@@ -273,14 +274,26 @@ def create_embeddings(
             for embedding in embeddings:
                 writer.write(embedding.to_dict())
     else:
-        # WIP NOTE: write via anticipated timdex_dataset.embeddings.write(...)
-        # NOTE: will likely use an imported TIMDEXEmbedding class from TDA, which the
-        #   Embedding instance will nearly 1:1 map to.
-        raise NotImplementedError
+        if not timdex_dataset:
+            # if input_jsonl, init TIMDEXDataset
+            timdex_dataset = TIMDEXDataset(dataset_location)
+        timdex_embeddings = TIMDEXEmbeddings(timdex_dataset)
+        timdex_embeddings.write(_dataset_embedding_iter(embeddings))
 
     logger.info("Embeddings creation complete.")
 
 
-if __name__ == "__main__":  # pragma: no cover
-    logger = logging.getLogger("embeddings.main")
-    main()
+def _dataset_embedding_iter(
+    embeddings: Iterator[Embedding],
+) -> Iterator[DatasetEmbedding]:
+    """Yield DatasetEmbedding objects from model embeddings."""
+    for embedding in embeddings:
+        yield DatasetEmbedding(
+            timdex_record_id=embedding.timdex_record_id,
+            run_id=embedding.run_id,
+            run_record_offset=embedding.run_record_offset,
+            embedding_model=embedding.model_uri,
+            embedding_strategy=embedding.embedding_strategy,
+            embedding_vector=embedding.embedding_vector,
+            embedding_object=json.dumps(embedding.embedding_token_weights).encode(),
+        )
