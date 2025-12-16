@@ -51,7 +51,7 @@ class Embedding:
     embedding_vector: list[float] | None
     embedding_token_weights: dict | None
 
-    timestamp: datetime.datetime = field(
+    embedding_timestamp: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
 

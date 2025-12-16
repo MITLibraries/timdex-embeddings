@@ -1,8 +1,8 @@
+import json
 from pathlib import Path
-from unittest.mock import patch
 
+import numpy as np
 from timdex_dataset_api import TIMDEXDataset
-from timdex_dataset_api.embeddings import TIMDEXEmbeddings
 
 from embeddings.cli import main
 
@@ -139,33 +139,23 @@ def test_model_required_decorator_works_across_commands(
     assert "OK" in result.output
 
 
-@patch("timdex_dataset_api.TIMDEXDataset.read_dicts_iter")
 def test_create_embeddings_writes_to_timdex_dataset(
-    mock_timdex_dataset_read_dicts_iter, register_mock_model, runner, tmp_path
+    caplog,
+    runner,
+    dataset_with_records,
+    register_mock_model,
 ):
-    mock_timdex_dataset_read_dicts_iter.return_value = iter(
-        [
-            {
-                "timdex_record_id": "record:1",
-                "run_id": "run-1",
-                "run_record_offset": 0,
-                "transformed_record": '{"title":"Record 1","description":"This is a record about coffee in the mountains."}',  # noqa: E501
-            }
-        ]
-    )
-
-    # init TIMDEX Dataset and Embeddings
-    timdex_dataset = TIMDEXDataset(location=str(tmp_path / "dataset"))
-    timdex_embeddings = TIMDEXEmbeddings(timdex_dataset)
+    caplog.set_level("DEBUG")
 
     result = runner.invoke(
         main,
         [
+            "--verbose",
             "create-embeddings",
             "--model-uri",
             "test/mock-model",
             "--dataset-location",
-            str(tmp_path / "dataset"),
+            dataset_with_records.location,
             "--run-id",
             "run-1",
             "--strategy",
@@ -173,10 +163,24 @@ def test_create_embeddings_writes_to_timdex_dataset(
         ],
     )
 
-    # TODO @jonavellecuerdo: Update to use TIMDEXEmbeddings # noqa: FIX002
-    # read method when ready
+    # assert CLI logged and exited cleanly
     assert result.exit_code == 0
-    assert Path(timdex_embeddings.data_embeddings_root).exists()
+    assert "total files: 1, total rows: 2" in caplog.text
+
+    # reload temp TIMDEXDataset post embeddings write
+    timdex_dataset = TIMDEXDataset(location=dataset_with_records.location)
+
+    # assert embeddings written
+    assert Path(timdex_dataset.embeddings.data_embeddings_root).exists()
+    embeddings_df = timdex_dataset.embeddings.read_dataframe(run_id="run-1")
+    assert len(embeddings_df) == 2
+
+    # assert embedding row structure
+    embedding_row = embeddings_df.iloc[0]
+    assert embedding_row.embedding_model == "test/mock-model"
+    assert embedding_row.embedding_strategy == "full_record"
+    assert isinstance(json.loads(embedding_row.embedding_object), dict)
+    assert isinstance(embedding_row.embedding_vector, np.ndarray)
 
 
 def test_create_embeddings_requires_strategy(register_mock_model, runner):
