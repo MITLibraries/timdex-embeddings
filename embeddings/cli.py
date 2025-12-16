@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 import click
 import jsonlines
 import smart_open
-from timdex_dataset_api import DatasetEmbedding, TIMDEXDataset, TIMDEXEmbeddings
+from timdex_dataset_api import DatasetEmbedding, TIMDEXDataset
 
 from embeddings.config import configure_logger, configure_sentry
 from embeddings.models.base import Embedding
@@ -277,8 +277,7 @@ def create_embeddings(
         if not timdex_dataset:
             # if input_jsonl, init TIMDEXDataset
             timdex_dataset = TIMDEXDataset(dataset_location)
-        timdex_embeddings = TIMDEXEmbeddings(timdex_dataset)
-        timdex_embeddings.write(_dataset_embedding_iter(embeddings))
+        timdex_dataset.embeddings.write(_dataset_embedding_iter(embeddings))
 
     logger.info("Embeddings creation complete.")
 
@@ -296,4 +295,5 @@ def _dataset_embedding_iter(
             embedding_strategy=embedding.embedding_strategy,
             embedding_vector=embedding.embedding_vector,
             embedding_object=json.dumps(embedding.embedding_token_weights).encode(),
+            embedding_timestamp=embedding.embedding_timestamp.isoformat(),
         )

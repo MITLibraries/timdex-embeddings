@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from timdex_dataset_api import TIMDEXDataset
+from timdex_dataset_api.record import DatasetRecord
 
 from embeddings.embedding import Embedding, EmbeddingInput
 from embeddings.models import registry
@@ -111,3 +113,50 @@ def mock_snapshot_download(monkeypatch, tmp_path):
         "embeddings.models.os_neural_sparse_doc_v3_gte.snapshot_download", mock_snapshot
     )
     return mock_snapshot
+
+
+@pytest.fixture
+def dataset_with_records(tmp_path) -> TIMDEXDataset:
+    dataset_path = tmp_path / "dataset"
+
+    records = iter(
+        [
+            DatasetRecord(
+                timdex_record_id="apple:1",
+                source="apples",
+                run_id="run-1",
+                run_record_offset=0,
+                run_date="2025-12-16",
+                run_timestamp="2025-12-16T00:00:00",
+                run_type="full",
+                source_record=b"",
+                transformed_record=(
+                    b"""{"title":"Apple 1","description":"""
+                    b""""This is a tale about apples."}"""
+                ),
+                action="index",
+            ),
+            DatasetRecord(
+                timdex_record_id="apple:2",
+                source="apples",
+                run_id="run-1",
+                run_record_offset=1,
+                run_date="2025-12-16",
+                run_timestamp="2025-12-16T00:00:00",
+                run_type="full",
+                source_record=b"",
+                transformed_record=(
+                    b"""{"title":"Apple 1","description":"""
+                    b""""This is a tale about apples."}"""
+                ),
+                action="index",
+            ),
+        ]
+    )
+
+    timdex_dataset = TIMDEXDataset(str(dataset_path))
+    timdex_dataset.write(records)
+    timdex_dataset.metadata.rebuild_dataset_metadata()
+
+    # reload and return dataset
+    return TIMDEXDataset(str(dataset_path))
