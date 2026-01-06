@@ -1,5 +1,4 @@
 name: CI
-on: push
 jobs:
   test:
     uses: mitlibraries/.github/.github/workflows/python-uv-shared-test.yml@main
