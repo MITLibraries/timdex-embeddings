@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from embeddings.models.base import BaseEmbeddingModel
 
+logger.info("TEST: Trigger GitHub Action CI")
+
 
 @click.group("embeddings")
 @click.option(
