@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from embeddings.models.base import BaseEmbeddingModel
 
+logger.info("[TEST] Attempt to trigger CI workflow")
+
 
 @click.group("embeddings")
 @click.option(
