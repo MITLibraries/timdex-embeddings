@@ -21,13 +21,16 @@ COPY embeddings ./embeddings
 # Copy fixtures
 COPY tests/fixtures /fixtures
 
-# Download the model and include in the Docker image
+# Set environment variables
 # NOTE: The env vars "TE_MODEL_URI" and "TE_MODEL_PATH" are set here to support
-#  the downloading of the model during image build, but also persist in the container and
-#  effectively set the default model.
+# the downloading of the model during image build, but also persist in the container
+# and serve to set the default model.
+ENV PYTHONPATH=/app
 ENV HF_HUB_DISABLE_PROGRESS_BARS=true
 ENV TE_MODEL_URI=opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte
 ENV TE_MODEL_PATH=/model
-RUN python -m embeddings.cli --verbose download-model
 
-ENTRYPOINT ["python", "-m", "embeddings.cli"]
+# Download the model and include in the Docker image
+RUN embeddings --verbose download-model
+
+ENTRYPOINT ["embeddings"]
