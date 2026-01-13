@@ -87,6 +87,10 @@ def model_required(f: Callable) -> Callable:
     )
     @functools.wraps(f)
     def wrapper(*args: tuple, **kwargs: dict[str, str | Path]) -> Callable:
+        # early exit if --help passed
+        if "help" in kwargs:
+            return f(*args, **kwargs)
+
         # pop "model_uri" and "model_path" from CLI args
         model_uri: str = str(kwargs.pop("model_uri"))
         model_path: str | Path = str(kwargs.pop("model_path"))
