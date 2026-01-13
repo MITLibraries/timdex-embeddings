@@ -22,7 +22,7 @@ help: # Preview Makefile commands
 ##############################################
 
 install: .venv .git/hooks/pre-commit # Install Python dependencies and create virtual environment if not exists
-	uv sync --dev
+	uv sync --group dev --group local
 
 .venv: # Creates virtual environment if not found
 	@echo "Creating virtual environment at .venv..."
@@ -36,7 +36,7 @@ venv: .venv # Create the Python virtual environment
 
 update: # Update Python dependencies
 	uv lock --upgrade
-	uv sync --dev
+	uv sync --group dev --group local
 
 ######################
 # Unit test commands
@@ -79,14 +79,17 @@ ruff-apply: # Resolve 'fixable errors' with 'ruff'
 ####################################
 # Docker
 ####################################
-docker-build: # Build local image for testing
-	docker build --platform $(CPU_ARCH) -t timdex-embeddings:latest .
+docker-build-dlc-arm64-cpu:
+	docker build \
+	-f Dockerfile-arm64-cpu \
+	--platform linux/arm64 \
+	-t $(ECR_NAME_DEV):dlc-arm64-cpu .
 
-docker-shell: # Shell into local container for testing
-	docker run -it --entrypoint='bash' timdex-embeddings:latest
-
-docker-run: # Run main entrypoint + command without arguments
-	docker run timdex-embeddings:latest
+docker-build-dlc-amd64-gpu:
+	docker build \
+	-f Dockerfile-amd64-gpu \
+	--platform linux/amd64 \
+	-t $(ECR_NAME_DEV):dlc-amd64-gpu .
 
 
 ### Terraform-generated Developer Deploy Commands for Dev environment ###

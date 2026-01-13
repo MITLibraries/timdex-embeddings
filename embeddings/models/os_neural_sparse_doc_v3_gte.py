@@ -191,7 +191,7 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
 
         # read env vars for configurations
         num_workers = int(os.getenv("TE_NUM_WORKERS", "1"))
-        batch_size = int(os.getenv("TE_BATCH_SIZE", "32"))
+        batch_size = int(os.getenv("TE_BATCH_SIZE", "4"))
         chunk_size_env = os.getenv("TE_CHUNK_SIZE")
         chunk_size = int(chunk_size_env) if chunk_size_env else None
 

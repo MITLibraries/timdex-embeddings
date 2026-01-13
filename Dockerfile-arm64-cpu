@@ -1,4 +1,8 @@
-FROM python:3.12-slim
+# NOTE: 763104351884.dkr.ecr.us-east-1.amazonaws.com is preferred over public.ecr.aws/deep-learning-containers
+# when building in AWS to minimize network traffic and latency.  To install locall, you may need to authenticate
+# for ECR image pulls with,
+# 	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 763104351884.dkr.ecr.us-east-1.amazonaws.com
+FROM 763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-inference-arm64:2.6.0-cpu-py312-ubuntu22.04-ec2
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git ca-certificates && \
@@ -10,10 +14,10 @@ ENV UV_SYSTEM_PYTHON=1
 WORKDIR /app
 
 # Copy project metadata
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml ./
 
 # Install package into system python
-RUN uv pip install --system .
+RUN uv pip install --group dlc_arm64_cpu --system .
 
 # Copy CLI application
 COPY embeddings ./embeddings
