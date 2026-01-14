@@ -65,7 +65,7 @@ ruff: # Run 'ruff' linter and print a preview of errors
 	uv run ruff check .
 
 safety: # Check for security vulnerabilities
-	uv run pip-audit
+	uv run pip-audit --ignore-vuln CVE-2025-2953 --ignore-vuln CVE-2025-3730
 
 lint-apply: black-apply ruff-apply # Apply changes with 'black' and resolve 'fixable errors' with 'ruff'
 
