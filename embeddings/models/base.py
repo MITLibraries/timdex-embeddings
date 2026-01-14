@@ -60,10 +60,13 @@ class BaseEmbeddingModel(ABC):
 
     @abstractmethod
     def create_embeddings(
-        self, embedding_inputs: Iterator[EmbeddingInput]
+        self,
+        embedding_inputs: Iterator[EmbeddingInput],
+        batch_size: int = 100,
     ) -> Iterator[Embedding]:
         """Yield Embeddings for multiple EmbeddingInputs.
 
         Args:
             embedding_inputs: iterator of EmbeddingInputs
+            batch_size: number of inputs to process per batch
         """

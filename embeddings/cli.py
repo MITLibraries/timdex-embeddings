@@ -214,6 +214,14 @@ def test_model_load(ctx: click.Context) -> None:
     default=None,
     help="Optionally write embeddings to local JSONLines file (primarily for testing).",
 )
+@click.option(
+    "--batch-size",
+    required=False,
+    type=int,
+    default=100,
+    envvar="EMBEDDING_BATCH_SIZE",
+    help="Number of embeddings to process per batch.",
+)
 def create_embeddings(
     ctx: click.Context,
     dataset_location: str,
@@ -223,6 +231,7 @@ def create_embeddings(
     input_jsonl: str,
     strategy: list[str],
     output_jsonl: str,
+    batch_size: int,
 ) -> None:
     """Create embeddings for TIMDEX records."""
     model: BaseEmbeddingModel = ctx.obj["model"]
@@ -264,7 +273,7 @@ def create_embeddings(
     embedding_inputs = create_embedding_inputs(timdex_records, list(strategy))
 
     # create embeddings via the embedding model
-    embeddings = model.create_embeddings(embedding_inputs)
+    embeddings = model.create_embeddings(embedding_inputs, batch_size=batch_size)
 
     # write embeddings to TIMDEX dataset (default) or to a JSONLines file
     if output_jsonl:

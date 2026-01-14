@@ -2,6 +2,7 @@ import json
 import logging
 import zipfile
 from collections.abc import Iterator
+from itertools import batched
 from pathlib import Path
 
 import pytest
@@ -60,10 +61,15 @@ class MockEmbeddingModel(BaseEmbeddingModel):
         )
 
     def create_embeddings(
-        self, embedding_inputs: Iterator[EmbeddingInput]
+        self,
+        embedding_inputs: Iterator[EmbeddingInput],
+        batch_size: int = 100,
     ) -> Iterator[Embedding]:
-        for embedding_input in embedding_inputs:
-            yield self.create_embedding(embedding_input)
+        if batch_size < 1:
+            return
+        for embedding_inputs_batch in batched(embedding_inputs, batch_size):
+            for embedding_input in embedding_inputs_batch:
+                yield self.create_embedding(embedding_input)
 
 
 @pytest.fixture

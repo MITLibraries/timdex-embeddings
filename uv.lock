@@ -1891,11 +1891,7 @@ dev = [
     { name = "pytest" },
     { name = "ruff" },
 ]
-dlc-amd64-gpu = [
-    { name = "sentence-transformers" },
-]
 local = [
-    { name = "sentence-transformers" },
     { name = "torch" },
 ]
 
@@ -1921,12 +1917,9 @@ dev = [
     { name = "pytest", specifier = ">=8.4.1" },
     { name = "ruff", specifier = ">=0.12.8" },
 ]
-dlc-amd64-gpu = [{ name = "sentence-transformers", specifier = ">=5.1.2" }]
+dlc-amd64-gpu = []
 dlc-arm64-cpu = []
-local = [
-    { name = "sentence-transformers", specifier = ">=5.1.2" },
-    { name = "torch", specifier = ">=2.6,<2.7" },
-]
+local = [{ name = "torch", specifier = ">=2.6,<2.7" }]
 
 [[package]]
 name = "tokenizers"
