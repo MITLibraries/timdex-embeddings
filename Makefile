@@ -1,8 +1,5 @@
 SHELL=/bin/bash
 DATETIME:=$(shell date -u +%Y%m%dT%H%M%SZ)
-VALID_ARCH := linux/amd64 linux/arm64
-GPU_ARCH := $(shell jq -r '.gpu // "linux/amd64"' .aws-architecture 2>/dev/null)
-NOGPU_ARCH := $(shell jq -r '.nogpu // "linux/amd64"' .aws-architecture 2>/dev/null)
 
 ### This is the Terraform-generated header for timdex-embeddings-dev. If  ###
 ###   this is a Lambda repo, uncomment the FUNCTION line below            ###
@@ -10,6 +7,60 @@ NOGPU_ARCH := $(shell jq -r '.nogpu // "linux/amd64"' .aws-architecture 2>/dev/n
 ECR_NAME_DEV := timdex-embeddings-dev
 ECR_URL_DEV := 222053980223.dkr.ecr.us-east-1.amazonaws.com/timdex-embeddings-dev
 ### End of Terraform-generated header                                     ###
+
+##############################################
+# This Makefile is intended for both local developer use as well as for use 
+# by GitHub Actions. We construct a collection of env vars so that this
+# Makefile can be used in different environments smoothly.
+##############################################
+
+# The $CI env var is "true" when running in GitHub Actions, so we make it
+# "false" by default for local runs (since $CI should never be set locally on 
+# a developer machine). We also set $GH_EVENT and $PR_NUM env vars to empty
+# (these will be overridden when running in GHA).
+CI ?= false
+GH_EVENT ?=
+PR_NUM ?=
+GIT_SHA := $(shell git describe --always)
+
+# For validation testing of the .aws-architecture file
+VALID_ARCH := linux/amd64 linux/arm64
+
+# Extract/set the architecture for GPU builds and non-GPU builds from the 
+# .aws-architecture file
+GPU_ARCH := $(shell jq -r '.gpu // "linux/amd64"' .aws-architecture 2>/dev/null)
+NOGPU_ARCH := $(shell jq -r '.nogpu // "linux/amd64"' .aws-architecture 2>/dev/null)
+
+# Set variables related to tagging containers for local, dev, stage, and prod
+# builds. These are set as recursively defined variables so that they only 
+# get built when a target actually runs.
+ARCH_SUFFIX = $(shell echo $(ARCH) | cut -d'/' -f2)
+LOCAL_TAGS = \
+	--tag $(ECR_URL_DEV):latest-$(ARCH_SUFFIX)-$(VARIANT) \
+	--tag $(ECR_URL_DEV):make-$(GIT_SHA)-$(ARCH_SUFFIX)-$(VARIANT) \
+	--tag $(ECR_NAME_DEV):latest-$(ARCH_SUFFIX)-$(VARIANT)
+CI_DEV_TAGS = \
+	--tag $(ECR_URL_DEV):latest-$(ARCH_SUFFIX)-$(VARIANT) \
+	--tag $(ECR_URL_DEV):PR-$(PR_NUM)-$(ARCH_SUFFIX)-$(VARIANT) 
+
+test-vars-gpu: VARIANT=gpu 
+test-vars-gpu: ARCH=$(GPU_ARCH)
+test-vars-gpu: ## temporary for testing variables for various environments
+	@echo "CI = $(CI)"; \
+	echo "PR_NUM = $(PR_NUM)"; \
+	echo "GIT_SHA = $(GIT_SHA)"; \
+	echo "LOCAL_TAGS = $(LOCAL_TAGS)"; \
+	echo "CI_DEV_TAGS = $(CI_DEV_TAGS)"
+
+test-vars-nogpu: VARIANT=cpu
+test-vars-nogpu: ARCH=$(NOGPU_ARCH)
+test-vars-nogpu:  ## temporary for testing variables for various environments
+	@echo "VARIANT = $(VARIANT)"; \
+	echo "CI = $(CI)"; \
+	echo "PR_NUM = $(PR_NUM)"; \
+	echo "GIT_SHA = $(GIT_SHA)"; \
+	echo "LOCAL_TAGS = $(LOCAL_TAGS)"; \
+	echo "CI_DEV_TAGS = $(CI_DEV_TAGS)"
 
 help: # Preview Makefile commands
 	@awk 'BEGIN { FS = ":.*#"; print "Usage:  make <target>\n\nTargets:" } \
@@ -79,19 +130,6 @@ ruff-apply: # Resolve 'fixable errors' with 'ruff'
 
 
 ####################################
-# Docker
-####################################
-
-docker-build: # Build local image for testing
-	docker build --platform $(CPU_ARCH) -t timdex-embeddings:latest .
-
-docker-shell: # Shell into local container for testing
-	docker run -it --entrypoint='bash' timdex-embeddings:latest
-
-docker-run: # Run main entrypoint + command without arguments
-	docker run timdex-embeddings:latest
-
-####################################
 # Developer Build and Deploy Commands for Dev environment in AWS
 ####################################
 
@@ -112,11 +150,11 @@ ensure-builder: ## Ensures the the buildx builder is ready to go
 	docker buildx prune -af --filter until=24h || true; \
 
 dist-dev-gpu: validate-arch ensure-builder ## Build GPU-enabled docker container (intended for developer-based manual build)
-	@ARCH_TAG="latest-$(shell echo $(GPU_ARCH) | cut -d'/' -f2)"; \
+	@VARIANT := gpu; \
 	echo "Build GPU-enabled container (for $(GPU_ARCH))"; \
 	docker buildx build --platform $(GPU_ARCH) \
 		--file Dockerfile.gpu \
-		--load \
+		$(if $(CI),--push,--load) \
 	    --tag $(ECR_URL_DEV):$$ARCH_TAG \
 	    --tag $(ECR_URL_DEV):make-$$ARCH_TAG \
 		--tag $(ECR_URL_DEV):make-$(shell git describe --always)-$$ARCH_TAG \
@@ -124,11 +162,11 @@ dist-dev-gpu: validate-arch ensure-builder ## Build GPU-enabled docker container
 		.
 
 dist-dev-nogpu: validate-arch ensure-builder ## Build non-GPU docker container (intended for developer-based manual build)
-	@ARCH_TAG="latest-$(shell echo $(NOGPU_ARCH) | cut -d'/' -f2)"; \
+	@VARIANT := cpu; \
 	echo "Build non-GPU container (for $(NOGPU_ARCH))"; \
 	docker buildx build --platform $(NOGPU_ARCH) \
 		--file Dockerfile.nogpu \
-		--load \
+		$(if $(CI),--push,--load) \
 	    --tag $(ECR_URL_DEV):$$ARCH_TAG \
 	    --tag $(ECR_URL_DEV):make-$$ARCH_TAG \
 		--tag $(ECR_URL_DEV):make-$(shell git describe --always)-$$ARCH_TAG \
@@ -137,8 +175,8 @@ dist-dev-nogpu: validate-arch ensure-builder ## Build non-GPU docker container (
 
 dist-dev: dist-dev-gpu dist-dev-nogpu ## Runs both the GPU and the NOGPU builds
 
-publish-dev-gpu: ## Build, tag and push GPU-enabled container (intended for developer-based manual publish)
-	@ARCH_TAG="latest-$(shell echo $(GPU_ARCH) | cut -d'/' -f2)"; \
+publish-dev-gpu: dist-dev-gpu ## Build, tag and push GPU-enabled container (intended for developer-based manual publish)
+	@ARCH_TAG="latest-$(shell echo $(GPU_ARCH) | cut -d'/' -f2)-gpu"; \
 	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(ECR_URL_DEV); \
 	docker push $(ECR_URL_DEV):$$ARCH_TAG; \
 	docker push $(ECR_URL_DEV):make-$$ARCH_TAG; \
@@ -146,8 +184,8 @@ publish-dev-gpu: ## Build, tag and push GPU-enabled container (intended for deve
     echo "Cleaning up dangling Docker images..."; \
     docker image prune -f --filter "dangling=true"
 
-publish-dev-nogpu: ## Build, tag and push no-GPU conatiner (intended for developer-based manual publish)
-	@ARCH_TAG="latest-$(shell echo $(NOGPU_ARCH) | cut -d'/' -f2)"; \
+publish-dev-nogpu: dist-dev-nogpu ## Build, tag and push no-GPU conatiner (intended for developer-based manual publish)
+	@ARCH_TAG="latest-$(shell echo $(NOGPU_ARCH) | cut -d'/' -f2)-cpu"; \
 	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(ECR_URL_DEV); \
 	docker push $(ECR_URL_DEV):$$ARCH_TAG; \
 	docker push $(ECR_URL_DEV):make-$$ARCH_TAG; \
@@ -158,8 +196,8 @@ publish-dev-nogpu: ## Build, tag and push no-GPU conatiner (intended for develop
 publish-dev: publish-dev-gpu publish-dev-nogpu ## Publish both images to AWS
 
 docker-clean: ## Clean up Docker detritus
-	@GPUARCH_TAG="latest-$(shell echo $(GPU_ARCH) | cut -d'/' -f2)"; \
-	NOGPUARCH_TAG="latest-$(shell echo $(NOGPU_ARCH) | cut -d'/' -f2)"; \
+	@GPUARCH_TAG="latest-$(shell echo $(GPU_ARCH) | cut -d'/' -f2)-gpu"; \
+	NOGPUARCH_TAG="latest-$(shell echo $(NOGPU_ARCH) | cut -d'/' -f2)-cpu"; \
 	echo "Cleaning up Docker leftovers (containers, images, builders)"; \
 	docker rmi -f $(ECR_URL_DEV):$$GPUARCH_TAG $(ECR_URL_DEV):$$NOGPUARCH_TAG || true; \
 	docker rmi -f $(ECR_URL_DEV):make-$$GPUARCH_TAG $(ECR_URL_DEV):make-$$NOGPUARCH_TAG || true; \
