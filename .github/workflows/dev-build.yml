@@ -1,9 +1,9 @@
-### This is the Terraform-generated dev-build.yml workflow for the         ### 
-### timdex-embeddings-dev app repository.                                  ###
-### If this is a Lambda repo, uncomment the FUNCTION line at the end of    ### 
-### the document. If the container requires any additional pre-build       ### 
-### commands, uncomment and edit the PREBUILD line at the end of the       ###
-### document.                                                              ###
+### This is a custom dev-build.yml workflow for the                        ### 
+### timdex-embeddings-dev app repository. It is customized in order to     ###
+### support parallel builds for amd64 and/or arm64 for AWS Batch compute   ###
+### environments that have GPUs and compute environments that do NOT have  ###
+### GPUs.                                                                  ###
+
 
 name: Dev Container Build and Deploy
 on:
@@ -26,15 +26,35 @@ env:
   REPOSITORY: "timdex-embeddings-dev"
 
 jobs:
-  build-and-deploy:
-    name: Build and Deploy (${{ matrix.variant }}) to Dev
+  choose-runners:
+    name: Determine Runner architecture from .aws-architecture file
     runs-on: ubuntu-latest
+    outputs:
+      gpu_arch: ${{ steps.out.outputs.gpu_arch }}
+      cpu_arch: ${{ steps.out.outputs.cpu_arch }}
+    steps:
+      - uses: actions/checkout@v5
 
+      - id: out
+        run: |
+          GPU_ARCH=$(jq -r '.gpu // "linux/amd64"' .aws-architecture)
+          CPU_ARCH=$(jq -r '.cpu // "linux/amd64"' .aws-architecture)
+          echo "gpu_arch=$GPU_ARCH" >> $GITHUB_OUTPUT
+          echo "cpu_arch=$CPU_ARCH" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build ${{ matrix.variant }} (${{ matrix.arch }})
+    needs: choose-runners
     strategy:
       fail-fast: false
       matrix:
-        variant: [gpu, cpu]
-    
+        include:
+          - variant: gpu
+            arch: ${{ needs.choose-runners.outputs.gpu_arch }}
+          - variant: cpu
+            arch: ${{ needs.choose-runners.outputs.cpu_arch }}
+    runs-on: ${{ matrix.arch == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -43,7 +63,7 @@ jobs:
         id: tags
         run: |
           KEY=${{ matrix.variant }}
-          ARCH=$(jq -r ".${KEY} // \"linux/amd64\"" .aws-architecture 2>/dev/null)
+          ARCH=${{ matrix.arch }}
           TAG_ARCH=$(echo "$ARCH" | cut -d'/' -f2)
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             TAG_SHA=$(echo $GITHUB_SHA | cut -c 1-8)
@@ -54,14 +74,15 @@ jobs:
           fi
           echo "arch=${ARCH}" >> $GITHUB_OUTPUT
           echo "tag_latest=latest-${TAG_ARCH}-${KEY}" >> $GITHUB_OUTPUT 
-          echo "tag_sha=${TAG_SHA}" >> $GITHUB_OUTPUT
-          echo "tag_pr=${TAG_PR}" >> $GITHUB_OUTPUT
+          echo "tag_sha=${TAG_SHA}-${TAG_ARCH}-${KEY}" >> $GITHUB_OUTPUT
+          echo "tag_pr=${TAG_PR}-${TAG_ARCH}-${KEY}" >> $GITHUB_OUTPUT
 
       - name: Free Disk Space
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /usr/local/lib/android
           sudo rm -rf /opt/ghc
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Configure AWS Dev credentials
         uses: aws-actions/configure-aws-credentials@v5
@@ -73,24 +94,25 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Setup Docker BuildX
+      - name: Setup BuildX Builder
+        id: buildx
         uses: docker/setup-buildx-action@v3
-        
-      - name: Build and push container (${{ matrix.variant }})
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ARCH: ${{ steps.tags.outputs.arch }}
-          TAG_SHA: ${{ steps.tags.outputs.tag_sha }}
-          TAG_PR: ${{ steps.tags.outputs.tag_pr }}
-          TAG_LATEST: ${{ steps.tags.outputs.tag_latest }}
-        run: |
-          echo "### :whale: Docker Build & Push" >> $GITHUB_STEP_SUMMARY
-          docker buildx build --platform ${{ env.ARCH }} \
-            --file Dockerfile-${{ matrix.variant }} \
-            --progress=plain \
-            --push \
-            --tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_LATEST }} \
-            --tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_SHA }} \
-            --tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_PR }} \
-            .
-          echo "✅ Successfully built and deployed the ${{ matrix.variant }} container." >> $GITHUB_STEP_SUMMARY
+        with:
+          driver: docker-container
+
+      - name: Build and push (${{ matrix.variant }})
+        uses: docker/build-push-action@v6
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          context: .
+          file: ./Dockerfile-${{ matrix.variant }}
+          pull: true
+          push: true
+          sbom: false
+          provenance: false
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY }}:${{ steps.tags.outputs.tag_latest }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY }}:${{ steps.tags.outputs.tag_sha }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.REPOSITORY }}:${{ steps.tags.outputs.tag_pr }}

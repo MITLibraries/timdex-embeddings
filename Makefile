@@ -13,7 +13,7 @@ help: # Preview Makefile commands
 
 # ensure OS binaries aren't called if naming conflict with Make recipes
 .PHONY: help venv install update test coveralls lint black mypy ruff safety lint-apply black-apply ruff-apply \
-	validate-arch dist-dev-gpu dist-dev-cpu dist-dev publish-dev-gpu publish-dev-cpu publish-dev docker-clean
+	validate-arch dist-dev-gpu dist-dev-cpu dist-dev-all publish-dev-gpu publish-dev-cpu publish-dev-all docker-clean
 
 ##############################################
 # Python Environment and Dependency commands
@@ -85,13 +85,14 @@ GIT_SHA := $(shell git describe --always)
 VALID_ARCH := linux/amd64 linux/arm64
 
 # Extract/set the architecture for GPU builds and non-GPU builds from the 
-# .aws-architecture file
+# .aws-architecture file, defaulting to "linux/amd64" if the key does not 
+# exist in the file.
 GPU_ARCH := $(shell jq -r '.gpu // "linux/amd64"' .aws-architecture 2>/dev/null)
 GPU_TAG := $(shell echo $(GPU_ARCH) | cut -d'/' -f2)-gpu
 CPU_ARCH := $(shell jq -r '.cpu // "linux/amd64"' .aws-architecture 2>/dev/null)
 CPU_TAG := $(shell echo $(CPU_ARCH) | cut -d'/' -f2)-cpu
 
-validate-arch: ## Ensure that the .aws-architecture file parsing above provided valid values
+validate-arch: ## Ensure that the parsing of the .aws-architecture file provided valid values
 	@if [ ! -f .aws-architecture ]; then \
 		echo "WARN: .aws-architecture not found. Using defaults gpu=linux/amd64, cpu=linux/amd64"; \
 	fi
@@ -135,7 +136,7 @@ dist-dev-cpu: validate-arch ensure-builder ## Build non-GPU docker container (in
 		.
 	@echo "Build for CPU container is done!"
 
-dist-dev: dist-dev-gpu dist-dev-cpu ## Runs both the GPU and the CPU builds
+dist-dev-all: dist-dev-gpu dist-dev-cpu ## Runs both the GPU and the CPU builds
 
 publish-dev-gpu: dist-dev-gpu ## Build, tag and push GPU-enabled container (intended for developer-based manual publish)
 	@aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $(ECR_URL_DEV); \
@@ -151,7 +152,7 @@ publish-dev-cpu: dist-dev-cpu ## Build, tag and push no-GPU container (intended 
 	@echo "Cleaning up dangling Docker images..."; \
 	docker image prune -f --filter "dangling=true"
 
-publish-dev: publish-dev-gpu publish-dev-cpu ## Publish both images to AWS
+publish-dev-all: publish-dev-gpu publish-dev-cpu ## Publish both images to AWS
 
 docker-clean: ## Clean up Docker detritus
 	echo "Cleaning up Docker leftovers (containers, images, builders)"; \
