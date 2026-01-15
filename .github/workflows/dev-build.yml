@@ -20,6 +20,11 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: "us-east-1"
+  GHA_ROLE: "timdex-embeddings-gha-dev"
+  REPOSITORY: "timdex-embeddings-dev"
+
 jobs:
   build-and-deploy:
     name: Build and Deploy (${{ matrix.variant }}) to Dev
@@ -28,11 +33,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [gpu, nogpu]
+        variant: [gpu, cpu]
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Set Tags
+        id: tags
+        run: |
+          KEY=${{ matrix.variant }}
+          ARCH=$(jq -r ".${KEY} // \"linux/amd64\"" .aws-architecture 2>/dev/null)
+          TAG_ARCH=$(echo "$ARCH" | cut -d'/' -f2)
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            TAG_SHA=$(echo $GITHUB_SHA | cut -c 1-8)
+            TAG_PR=$GITHUB_EVENT_NAME
+          else
+            TAG_SHA=$(echo ${{ github.event.pull_request.head.sha }} | cut -c 1-8)
+            TAG_PR="PR-${{ github.event.pull_request.number }}"
+          fi
+          echo "arch=${ARCH}" >> $GITHUB_OUTPUT
+          echo "tag_latest=latest-${TAG_ARCH}-${KEY}" >> $GITHUB_OUTPUT 
+          echo "tag_sha=${TAG_SHA}" >> $GITHUB_OUTPUT
+          echo "tag_pr=${TAG_PR}" >> $GITHUB_OUTPUT
 
       - name: Free Disk Space
         run: |
@@ -43,8 +66,8 @@ jobs:
       - name: Configure AWS Dev credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
-          aws-region: us-east-1
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_DEV }}:role/timdex-embeddings-gha-dev
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_DEV }}:role/${{ env.GHA_ROLE }}
 
       - name: Login to Dev ECR
         id: login-ecr
@@ -53,8 +76,21 @@ jobs:
       - name: Setup Docker BuildX
         uses: docker/setup-buildx-action@v3
         
-      - name: Build and push conatiner (${{ matrix.variant }})
+      - name: Build and push container (${{ matrix.variant }})
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ARCH: ${{ steps.tags.outputs.arch }}
+          TAG_SHA: ${{ steps.tags.outputs.tag_sha }}
+          TAG_PR: ${{ steps.tags.outputs.tag_pr }}
+          TAG_LATEST: ${{ steps.tags.outputs.tag_latest }}
         run: |
-          echo "### :whale: Docker Build & Publish" >> $GITHUB_STEP_SUMMARY
-          make test-vars-${{ matrix.variant }}
+          echo "### :whale: Docker Build & Push" >> $GITHUB_STEP_SUMMARY
+          docker buildx build --platform ${{ env.ARCH }} \
+            --file Dockerfile-${{ matrix.variant }} \
+            --progress=plain \
+            --push \
+            --tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_LATEST }} \
+            --tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_SHA }} \
+            --tag ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_PR }} \
+            .
           echo "✅ Successfully built and deployed the ${{ matrix.variant }} container." >> $GITHUB_STEP_SUMMARY

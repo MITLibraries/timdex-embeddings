@@ -1,4 +1,4 @@
 {
     "gpu": "linux/amd64",
-    "nogpu": "linux/arm64"
+    "cpu": "linux/arm64"
 }
