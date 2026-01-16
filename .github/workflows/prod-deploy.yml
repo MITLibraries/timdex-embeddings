@@ -1,7 +1,7 @@
-### This is the Terraform-generated prod-promote.yml workflow for the      ###
-### timdex-embeddings-prod repository.                                     ###
-### If this is a Lambda repo, uncomment the FUNCTION line at the end of    ###
-### the document.                                                          ###
+# ### This is the Terraform-generated prod-promote.yml workflow for the      ###
+# ### timdex-embeddings-prod repository.                                     ###
+# ### If this is a Lambda repo, uncomment the FUNCTION line at the end of    ###
+# ### the document.                                                          ###
 
 name: Prod Container Promote
 on:
@@ -13,44 +13,113 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  AWS_REGION: "us-east-1"
+  GHA_ROLE_STAGE: "timdex-embeddings-gha-stage"
+  GHA_ROLE_PROD: "timdex-embeddings-gha-prod"
+  ECR_STAGE: "timdex-embeddings-stage"
+  ECR_PROD: "timdex-embeddings-prod"
+
 jobs:
   prep:
     name: Prep for Promote
     runs-on: ubuntu-latest
     outputs: 
-      cpuarch: ${{ steps.setarch.outputs.cpuarch }}
+      gpu_arch_tag_latest: ${{ steps.out.outputs.gpu_arch_tag_latest }}
+      cpu_arch_tag_latest: ${{ steps.out.outputs.cpu_arch_tag_latest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set CPU Architecture
-        id: setarch
+      - id: out
         run: |
-          echo "### :abacus: Architecture Selection" >> $GITHUB_STEP_SUMMARY
-          if [[ -f .aws-architecture ]]; then
-            ARCH=$(cat .aws-architecture)
-            echo "\`$ARCH\` was read from \`.aws-architecture\` and passed to the deploy job." >> $GITHUB_STEP_SUMMARY
-          else
-            ARCH="linux/amd64"
-            echo "No \`.aws-architecture\` file, so default \`$ARCH\` was passed to the deploy job." >> $GITHUB_STEP_SUMMARY
-          fi
-          if [[ "$ARCH" != "linux/arm64" && "$ARCH" != "linux/amd64" ]]; then
-            echo "$ARCH is INVALID architecture!"
-            echo "$ARCH is INVALID architecture!" >> $GITHUB_STEP_SUMMARY
-            exit 1
-          fi
-          echo "cpuarch=$ARCH" >> $GITHUB_OUTPUT
+          GPU_ARCH=$(jq -r '.gpu // "linux/amd64"' .aws-architecture | cut -d'/' -f2)
+          CPU_ARCH=$(jq -r '.cpu // "linux/amd64"' .aws-architecture | cut -d'/' -f2)
+          echo "gpu_arch_tag_latest=latest-$GPU_ARCH-gpu" >> $GITHUB_OUTPUT
+          echo "cpu_arch_tag_latest=latest-$CPU_ARCH-cpu" >> $GITHUB_OUTPUT
 
-  deploy:
-    needs: prep
-    name: Deploy
-    uses: mitlibraries/.github/.github/workflows/ecr-multi-arch-promote-prod.yml@main
-    secrets: inherit
-    with:
-      AWS_REGION: "us-east-1"
-      GHA_ROLE_STAGE: timdex-embeddings-gha-stage
-      GHA_ROLE_PROD: timdex-embeddings-gha-prod
-      ECR_STAGE: "timdex-embeddings-stage"
-      ECR_PROD: "timdex-embeddings-prod"
-      CPU_ARCH: ${{ needs.prep.outputs.cpuarch }}
- 
+
+#   deploy:
+#     name: Deploy to Production
+#     runs-on: ubuntu-latest
+#     needs: prep
+#     steps:
+#       - name: Configure AWS credentials for Stage
+#         id: login-aws-stage
+#         uses: aws-actions/configure-aws-credentials@v5
+#         with:
+#           aws-region: ${{ env.AWS_REGION }}
+#           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_STAGE }}:role/${{ env.GHA_ROLE_STAGE }}
+
+#       - name: Check SHAs
+#         id: check_sha
+#         run: |
+#           export ECR_SHA=$(aws ecr describe-images --repository-name ${{ env.ECR_STAGE}} --image-ids imageTag=${{ needs.prep.outputs.cpu_arch_tag_latest }} --query 'imageDetails[].imageTags' | sed -E 's/[^a-zA-Z0-9]/\n/g' | grep -E '^[a-f0-9]{8}$')
+#           if [[ ${GITHUB_SHA::8} == $ECR_SHA ]]; then
+#             echo "sha_match=true" >> $GITHUB_OUTPUT
+#             echo "tag_sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+#             echo "tag_release=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+#             echo "### SHA Match Success" >> $GITHUB_STEP_SUMMARY
+#             echo "Continue to promoting the Stage container to Production." >> $GITHUB_STEP_SUMMARY
+#           else
+#             echo "sha_match=false" >> $GITHUB_OUTPUT
+#             echo "### SHA Match Failure" >> $GITHUB_STEP_SUMMARY
+#             echo "FAILURE: Stage-Workloads SHA did not match the main branch." >> $GITHUB_STEP_SUMMARY
+#             exit 1
+#           fi
+
+#       - name: Login to Stage Amazon ECR
+#         id: login-ecr-stage
+#         uses: aws-actions/amazon-ecr-login@v2
+
+#       - name: Download from Stage
+#         if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+#         env:
+#           REGISTRY: ${{ steps.login-ecr-stage.outputs.registry }}
+#           REPOSITORY: ${{ env.ECR_STAGE }}
+#           TAG_SHA: ${{ steps.check_sha.outputs.tag_sha }}
+#         run: docker pull ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_SHA }}
+
+#       - name: Configure AWS credentials for Prod
+#         if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+#         id: login-aws-prod
+#         uses: aws-actions/configure-aws-credentials@v5
+#         with:
+#           aws-region: ${{ env.AWS_REGION }}
+#           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_PROD }}:role/${{ env.GHA_ROLE_PROD }}
+
+#       - name: Login to Prod Amazon ECR
+#         if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+#         id: login-ecr-prod
+#         uses: aws-actions/amazon-ecr-login@v2
+
+#       - name: Re-tag and Push to Prod
+#         if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+#         env:
+#           REGISTRY_STAGE: ${{ steps.login-ecr-stage.outputs.registry }}
+#           REGISTRY_PROD: ${{ steps.login-ecr-prod.outputs.registry }}
+#           REPOSITORY_STAGE: ${{ env.ECR_STAGE }}
+#           REPOSITORY_PROD: ${{ env.ECR_PROD }}
+#           TAG_SHA: ${{ steps.check_sha.outputs.tag_sha }}
+#           TAG_RELEASE: ${{ needs.prep.outputs.cpu_arch_tag_latest }}
+#           TAG_LATEST: ${{ needs.prep.outputs.cpu_arch_tag_latest }}
+#         run: |
+#           echo "### :whale: Promote Container to Production" >> $GITHUB_STEP_SUMMARY
+#           docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${{ env.TAG_SHA }} ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_LATEST }}
+#           docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${{ env.TAG_SHA }} ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_SHA }}
+#           docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_LATEST }}
+#           docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_SHA }}
+          
+#           echo "✅ Promoted image to Prod ECR with the following tags:" >> $GITHUB_STEP_SUMMARY
+#           echo "- \`${{ env.TAG_LATEST }}\`" >> $GITHUB_STEP_SUMMARY
+#           echo "- \`${{ env.TAG_SHA }}\` (GitHub SHA)" >> $GITHUB_STEP_SUMMARY
+
+#           if [ $GITHUB_EVENT_NAME != "workflow_dispatch" ]; then
+#             docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${GITHUB_SHA::8} ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_RELEASE }}
+#             docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_RELEASE }}
+#             echo "- \`${{ env.TAG_RELEASE }}\` (GitHub Release Version)" >> $GITHUB_STEP_SUMMARY
+#           else
+#             docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${GITHUB_SHA::8} ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:MANUAL_TRIGGER
+#             docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:MANUAL_TRIGGER
+#             echo "- \`MANUAL_TRIGGER\`" >> $GITHUB_STEP_SUMMARY
+#           fi
