@@ -72,6 +72,13 @@ def test_model_required_decorator_with_env_var(
     assert output_path.exists()
 
 
+def test_model_required_decorator_help_flag_early_exit(runner):
+    """Ensure that passing --help does NOT require model information."""
+    result = runner.invoke(main, ["download-model", "--help"])
+
+    assert result.exit_code == 0
+
+
 def test_model_required_decorator_missing_parameter(runner):
     """Test decorator fails when --model-uri is not provided and env var is not set."""
     result = runner.invoke(main, ["download-model", "--model-path", "out.zip"])

@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import time
 from collections.abc import Iterator
+from itertools import batched
 from pathlib import Path
 from typing import cast
 
@@ -163,6 +164,7 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
     def create_embeddings(
         self,
         embedding_inputs: Iterator[EmbeddingInput],
+        batch_size: int = 100,
     ) -> Iterator[Embedding]:
         """Yield Embeddings for multiple EmbeddingInputs.
 
@@ -173,25 +175,15 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
         due to a "Bus Error".  It is recommended to omit the env var TE_NUM_WORKERS, or
         set to "1", in Docker contexts.
 
-        Currently, we also fully consume the input EmbeddingInputs before we start
-        embedding work.  This may change in future iterations if we move to batching
-        embedding creation, so until then it's assumed that inputs to this method are
-        memory safe for the full run.
+        Embeddings are computed in batches to manage memory pressure.  For this model
+        specifically, testing has shown that larger batches do not increase performance.
 
         Args:
             embedding_inputs: iterator of EmbeddingInputs
+            batch_size: number of inputs to process per batch
         """
-        # consume input EmbeddingInputs
-        embedding_inputs_list = list(embedding_inputs)
-        if not embedding_inputs_list:
-            return
-
-        # extract texts from all inputs
-        texts = [embedding_input.text for embedding_input in embedding_inputs_list]
-
-        # read env vars for configurations
         num_workers = int(os.getenv("TE_NUM_WORKERS", "1"))
-        batch_size = int(os.getenv("TE_BATCH_SIZE", "32"))
+        te_batch_size = int(os.getenv("TE_BATCH_SIZE", "4"))
         chunk_size_env = os.getenv("TE_CHUNK_SIZE")
         chunk_size = int(chunk_size_env) if chunk_size_env else None
 
@@ -205,27 +197,55 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             device = self.device
             pool = None
         logger.info(
-            f"Num workers: {num_workers}, batch size: {batch_size}, "
-            f"chunk size: {chunk_size, }device: {device}, pool: {pool}"
+            f"Num workers: {num_workers}, application batch size: {batch_size}, "
+            f"model batch size: {te_batch_size}, device: {device}, pool: {pool}"
         )
 
-        # get sparse vector embedding for input text(s)
         inference_start = time.perf_counter()
-        sparse_vectors = self._model.encode_document(
-            texts,
-            batch_size=batch_size,
-            device=device,
-            pool=pool,
-            save_to_cpu=True,
-            chunk_size=chunk_size,
-        )
-        logger.info(f"Inference elapsed: {time.perf_counter()-inference_start}s")
-        sparse_vectors = cast("list[Tensor]", sparse_vectors)
+        batch_index = 0
+        try:
+            # create embeddings in batches
+            for embedding_inputs_batch in batched(embedding_inputs, batch_size):
+                batch_index += 1
+                batch_start = time.perf_counter()
+                texts = [
+                    embedding_input.text for embedding_input in embedding_inputs_batch
+                ]
 
-        for i, embedding_input in enumerate(embedding_inputs_list):
-            sparse_vector = sparse_vectors[i]
-            sparse_vector = cast("Tensor", sparse_vector)
-            yield self._get_embedding_from_sparse_vector(embedding_input, sparse_vector)
+                # perform inference resulting in sparse vectors
+                sparse_vectors = self._model.encode_document(
+                    texts,
+                    batch_size=te_batch_size,
+                    device=device,
+                    pool=pool,
+                    save_to_cpu=True,
+                    chunk_size=chunk_size,
+                )
+                sparse_vectors = cast("list[Tensor]", sparse_vectors)
+                batch_elapsed = time.perf_counter() - batch_start
+                records_per_second = (
+                    len(embedding_inputs_batch) / batch_elapsed
+                    if batch_elapsed > 0
+                    else 0.0
+                )
+                logger.debug(
+                    f"Embeddings batch {batch_index}: "
+                    f"{len(embedding_inputs_batch)} records, "
+                    f"elapsed: {batch_elapsed:.2f}s, "
+                    f"records/sec: {records_per_second:.2f}"
+                )
+
+                # yield Embedding instances for batch
+                for i, embedding_input in enumerate(embedding_inputs_batch):
+                    sparse_vector = sparse_vectors[i]
+                    sparse_vector = cast("Tensor", sparse_vector)
+                    yield self._get_embedding_from_sparse_vector(
+                        embedding_input, sparse_vector
+                    )
+        finally:
+            if pool is not None:
+                self._model.stop_multi_process_pool(pool)
+        logger.info(f"Inference elapsed: {time.perf_counter() - inference_start}s")
 
     def _get_embedding_from_sparse_vector(
         self,
