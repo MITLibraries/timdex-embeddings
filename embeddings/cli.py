@@ -87,6 +87,10 @@ def model_required(f: Callable) -> Callable:
     )
     @functools.wraps(f)
     def wrapper(*args: tuple, **kwargs: dict[str, str | Path]) -> Callable:
+        # early exit if --help passed
+        if "help" in kwargs:
+            return f(*args, **kwargs)  # pragma: nocover
+
         # pop "model_uri" and "model_path" from CLI args
         model_uri: str = str(kwargs.pop("model_uri"))
         model_path: str | Path = str(kwargs.pop("model_path"))
@@ -210,6 +214,14 @@ def test_model_load(ctx: click.Context) -> None:
     default=None,
     help="Optionally write embeddings to local JSONLines file (primarily for testing).",
 )
+@click.option(
+    "--batch-size",
+    required=False,
+    type=int,
+    default=100,
+    envvar="EMBEDDING_BATCH_SIZE",
+    help="Number of embeddings to process per batch.",
+)
 def create_embeddings(
     ctx: click.Context,
     dataset_location: str,
@@ -219,6 +231,7 @@ def create_embeddings(
     input_jsonl: str,
     strategy: list[str],
     output_jsonl: str,
+    batch_size: int,
 ) -> None:
     """Create embeddings for TIMDEX records."""
     model: BaseEmbeddingModel = ctx.obj["model"]
@@ -260,7 +273,7 @@ def create_embeddings(
     embedding_inputs = create_embedding_inputs(timdex_records, list(strategy))
 
     # create embeddings via the embedding model
-    embeddings = model.create_embeddings(embedding_inputs)
+    embeddings = model.create_embeddings(embedding_inputs, batch_size=batch_size)
 
     # write embeddings to TIMDEX dataset (default) or to a JSONLines file
     if output_jsonl:
@@ -278,6 +291,7 @@ def create_embeddings(
             # if input_jsonl, init TIMDEXDataset
             timdex_dataset = TIMDEXDataset(dataset_location)
         timdex_dataset.embeddings.write(_dataset_embedding_iter(embeddings))
+        logger.info("Embeddings written to TIMDEX dataset.")
 
     logger.info("Embeddings creation complete.")
 

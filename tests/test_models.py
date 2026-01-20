@@ -1,3 +1,4 @@
+import logging
 import zipfile
 
 import pytest
@@ -51,6 +52,51 @@ def test_mock_model_create_embedding(mock_model):
     assert embedding.model_uri == "test/mock-model"
     assert embedding.embedding_vector == [0.1, 0.2, 0.3]
     assert embedding.embedding_token_weights == {"coffee": 0.9, "seattle": 0.5}
+
+
+def test_mock_model_create_embeddings_embeds_all_records(mock_model):
+    embedding_inputs = [
+        EmbeddingInput(
+            timdex_record_id=f"test-id-{i}",
+            run_id="test-run",
+            run_record_offset=i,
+            embedding_strategy="full_record",
+            text=f"test text {i}",
+        )
+        for i in range(5)
+    ]
+
+    embeddings = list(mock_model.create_embeddings(iter(embedding_inputs), batch_size=2))
+
+    assert len(embeddings) == len(embedding_inputs)
+    assert [e.timdex_record_id for e in embeddings] == [
+        inp.timdex_record_id for inp in embedding_inputs
+    ]
+
+
+def test_mock_model_create_embeddings_processes_in_batches(mock_model, caplog):
+    embedding_inputs = [
+        EmbeddingInput(
+            timdex_record_id=f"test-id-{i}",
+            run_id="test-run",
+            run_record_offset=i,
+            embedding_strategy="full_record",
+            text=f"test text {i}",
+        )
+        for i in range(5)
+    ]
+
+    with caplog.at_level(logging.DEBUG):
+        list(mock_model.create_embeddings(iter(embedding_inputs), batch_size=2))
+
+    batch_logs = [r for r in caplog.records if "Processing batch" in r.message]
+    assert len(batch_logs) == 3  # 5 items with batch_size=2 = 3 batches
+
+
+def test_mock_model_create_embeddings_empty_iterator(mock_model):
+    embeddings = list(mock_model.create_embeddings(iter([]), batch_size=2))
+
+    assert embeddings == []
 
 
 def test_registry_contains_opensearch_model():

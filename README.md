@@ -127,5 +127,6 @@ Options:
                                [required]
   --output-jsonl TEXT          Optionally write embeddings to local JSONLines
                                file (primarily for testing).
+  --batch-size INTEGER         Number of embeddings to process per batch.
   --help                       Show this message and exit.
 ```
