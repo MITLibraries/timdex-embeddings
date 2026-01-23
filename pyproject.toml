@@ -4,7 +4,7 @@
 
 [project]
 name = "timdex-embeddings"
-version = "1.0.0"
+version = "2.0.0"
 requires-python = ">=3.12"
 
 dependencies = [
@@ -15,7 +15,6 @@ dependencies = [
     "sentry-sdk>=2.34.1",
     "smart-open[s3]>=7.4.4",
     "timdex-dataset-api",
-    "torch>=2.9.0",
 ]
 
 [dependency-groups]
@@ -29,6 +28,17 @@ dev = [
     "pytest>=8.4.1",
     "ruff>=0.12.8",
 ]
+
+# dependency group for local virtual environment development work
+local = [
+    "torch>=2.6,<2.7",
+]
+
+# dependency group for arm64 / CPU AWS Deep Learning Container (DLC) base image
+dlc_arm64_cpu = []
+
+# dependency group for amd64 / GPU AWS Deep Learning Container (DLC) base image
+dlc_amd64_gpu = []
 
 [tool.black]
 line-length = 90
