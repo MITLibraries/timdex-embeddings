@@ -28,7 +28,9 @@ Note the Docker image build commands in the `Makefile`, allowing for building a 
 
 Also note that due to the size of the AWS Deep Learning Container (DLC) base images, these images can be quite large (~4gb for CPU, ~16gb for GPU).  For successful builds locally, you may need to increase the "Disk usage limit" in your local Docker environment; observed failures at 50gb, success at 96gb.
 
-See the following ADR for more background: [01-parallel-builds-both-archs.md](docs/adrs/01-parallel-builds-both-archs.md).
+See the following for more information:
+- [ADR](docs/adrs/01-parallel-builds-both-archs.md)
+- [Continuous Delivery (CD) documentation](docs/continuous-delivery-parallel-builds.md)
 
 ## Environment Variables
 
