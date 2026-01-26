@@ -94,10 +94,11 @@ Usage: embeddings download-model [OPTIONS]
   Download a model from HuggingFace and save locally.
 
 Options:
-  --model-uri TEXT   HuggingFace model URI (e.g., 'org/model-name')
-                     [required]
+  --model-uri TEXT   HuggingFace model URI (e.g., 'org/model-name'). Defaults
+                     to env var TE_MODEL_URI if set.  [required]
   --model-path PATH  Path where the model will be downloaded to and loaded
-                     from, e.g. '/path/to/model'.  [required]
+                     from, e.g. '/path/to/model'. Defaults to env var
+                     TE_MODEL_PATH if set.  [required]
   --help             Show this message and exit.
 ```
 
@@ -118,11 +119,13 @@ Usage: embeddings test-model-load [OPTIONS]
   model loads correctly.
 
 Options:
-  --model-uri TEXT   HuggingFace model URI (e.g., 'org/model-name')
-                     [required]
+  --model-uri TEXT   HuggingFace model URI (e.g., 'org/model-name'). Defaults
+                     to env var TE_MODEL_URI if set.  [required]
   --model-path PATH  Path where the model will be downloaded to and loaded
-                     from, e.g. '/path/to/model'.  [required]
+                     from, e.g. '/path/to/model'. Defaults to env var
+                     TE_MODEL_PATH if set.  [required]
   --help             Show this message and exit.
+
 ```
 
 ### `create-embeddings`
@@ -132,13 +135,18 @@ Usage: embeddings create-embeddings [OPTIONS]
   Create embeddings for TIMDEX records.
 
 Options:
-  --model-uri TEXT             HuggingFace model URI (e.g., 'org/model-name')
+  --model-uri TEXT             HuggingFace model URI (e.g., 'org/model-name').
+                               Defaults to env var TE_MODEL_URI if set.
                                [required]
   --model-path PATH            Path where the model will be downloaded to and
-                               loaded from, e.g. '/path/to/model'.  [required]
+                               loaded from, e.g. '/path/to/model'. Defaults to
+                               env var TE_MODEL_PATH if set.  [required]
   --dataset-location PATH      TIMDEX dataset location, e.g.
                                's3://timdex/dataset', to read records from.
-  --run-id TEXT                TIMDEX ETL run id.
+  --run-id TEXT                TIMDEX ETL run id. Mutually exclusive with
+                               --source.
+  --source TEXT                Retrieve current records from a TIMDEX source.
+                               Mutually exclusive with --run-id.
   --run-record-offset INTEGER  TIMDEX ETL run record offset to start from,
                                default = 0.
   --record-limit INTEGER       Limit number of records after --run-record-
@@ -151,5 +159,7 @@ Options:
   --output-jsonl TEXT          Optionally write embeddings to local JSONLines
                                file (primarily for testing).
   --batch-size INTEGER         Number of embeddings to process per batch.
+                               Defaults to env var EMBEDDING_BATCH_SIZE if
+                               set.
   --help                       Show this message and exit.
 ```
