@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM public.ecr.aws/deep-learning-containers/pytorch-inference:2.6.0-gpu-py312-cu124-ubuntu22.04-ec2
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends git ca-certificates && \
@@ -10,10 +10,10 @@ ENV UV_SYSTEM_PYTHON=1
 WORKDIR /app
 
 # Copy project metadata
-COPY pyproject.toml uv.lock* ./
+COPY pyproject.toml ./
 
 # Install package into system python
-RUN uv pip install --system .
+RUN uv pip install --group dlc_amd64_gpu --system .
 
 # Copy CLI application
 COPY embeddings ./embeddings
@@ -29,6 +29,7 @@ ENV PYTHONPATH=/app
 ENV HF_HUB_DISABLE_PROGRESS_BARS=true
 ENV TE_MODEL_URI=opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte
 ENV TE_MODEL_PATH=/model
+ENV TE_TORCH_DEVICE=cuda
 
 # Download the model and include in the Docker image
 RUN embeddings --verbose download-model

@@ -9,7 +9,28 @@ A CLI application for creating embeddings for TIMDEX.
 - To update dependencies: `make update`
 - To run unit tests: `make test`
 - To lint the repo: `make lint`
-- To run the app: `my-app --help` (Note the hyphen `-` vs underscore `_` that matches the `project.scripts` in `pyproject.toml`)
+- To run the app: `embeddings --help`
+  - see below for more details about running the CLI with `.env` files and arguments
+
+### Building Docker Images
+
+This project is unusual in that we have **two, distinct** Docker files for building:
+
+- `Dockerfile-cpu`
+  - targets an `arm64` architecture for CPU-only inference
+  - targets AWS Fargate ECS environment
+  - also a good fit for running locally on `arm64` machines
+- `Dockerfile-gpu`
+  - targets an `amd64` architecture for CPU or GPU inference
+  - targets AWS EC2 compute environment
+
+Note the Docker image build commands in the `Makefile`, allowing for building a CPU image, a GPU image, or both.  
+
+Also note that due to the size of the AWS Deep Learning Container (DLC) base images, these images can be quite large (~4gb for CPU, ~16gb for GPU).  For successful builds locally, you may need to increase the "Disk usage limit" in your local Docker environment; observed failures at 50gb, success at 96gb.
+
+See the following for more information:
+- [ADR](docs/adrs/01-parallel-builds-both-archs.md)
+- [Continuous Delivery (CD) documentation](docs/continuous-delivery-parallel-builds.md)
 
 ## Environment Variables
 
@@ -26,13 +47,15 @@ WORKSPACE=### Set to `dev` for local development, this will be set to `stage` an
 TE_MODEL_URI=# HuggingFace model URI
 TE_MODEL_PATH=# Path where the model will be downloaded to and loaded from
 HF_HUB_DISABLE_PROGRESS_BARS=#boolean to use progress bars for HuggingFace model downloads; defaults to 'true' in deployed contexts
-# inference performance tuning
+
 TE_TORCH_DEVICE=# defaults to 'cpu', but can be set to 'mps' for Apple Silicon, or theoretically 'cuda' for GPUs
 TE_BATCH_SIZE=# batch size for each inference worker, defaults to 32
 TE_NUM_WORKERS=# number of parallel model inference workers, defaults to 1
 TE_CHUNK_SIZE=# number of batches each parallel worker grabs; no effect if TE_NUM_WORKERS=1
 OMP_NUM_THREADS=# torch env var that sets thread usage during inference, default is not setting and using torch defaults
 MKL_NUM_THREADS=# torch env var that sets thread usage during inference, default is not setting and using torch defaults
+
+EMBEDDING_BATCH_SIZE=# controls batch size sent to model for embedding generation, primary memory management knob, defaults to 100
 ```
 
 ## Configuring an Embedding Model

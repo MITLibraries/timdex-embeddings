@@ -1,0 +1,36 @@
+FROM public.ecr.aws/deep-learning-containers/pytorch-inference-arm64:2.6.0-cpu-py312-ubuntu22.04-ec2
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+ENV UV_SYSTEM_PYTHON=1
+
+WORKDIR /app
+
+# Copy project metadata
+COPY pyproject.toml ./
+
+# Install package into system python
+RUN uv pip install --group dlc_arm64_cpu --system .
+
+# Copy CLI application
+COPY embeddings ./embeddings
+
+# Copy fixtures
+COPY tests/fixtures /fixtures
+
+# Set environment variables
+# NOTE: The env vars "TE_MODEL_URI" and "TE_MODEL_PATH" are set here to support
+# the downloading of the model during image build, but also persist in the container
+# and serve to set the default model.
+ENV PYTHONPATH=/app
+ENV HF_HUB_DISABLE_PROGRESS_BARS=true
+ENV TE_MODEL_URI=opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte
+ENV TE_MODEL_PATH=/model
+
+# Download the model and include in the Docker image
+RUN embeddings --verbose download-model
+
+ENTRYPOINT ["embeddings"]
