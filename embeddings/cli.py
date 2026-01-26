@@ -253,13 +253,15 @@ def create_embeddings(
     model.load()
     timdex_dataset: TIMDEXDataset | None = None
 
-    # read input records from TIMDEX dataset (default) or a JSONLines file
+    # JSONLines input (primarily for testing)
     if input_jsonl:
         with (
             smart_open.open(input_jsonl, "r") as file_obj,  # type: ignore[no-untyped-call]
             jsonlines.Reader(file_obj) as reader,
         ):
             timdex_records = iter(list(reader))
+
+    # default: read from TIMDEX dataset
     else:
         if not dataset_location:
             raise click.UsageError(
@@ -315,7 +317,7 @@ def create_embeddings(
     # create embeddings via the embedding model
     embeddings = model.create_embeddings(embedding_inputs, batch_size=batch_size)
 
-    # write embeddings to TIMDEX dataset (default) or to a JSONLines file
+    # JSONLines output (primarily for testing)
     if output_jsonl:
         with (
             smart_open.open(output_jsonl, "w") as s3_file,  # type: ignore[no-untyped-call]
@@ -326,9 +328,15 @@ def create_embeddings(
         ):
             for embedding in embeddings:
                 writer.write(embedding.to_dict())
-    if timdex_dataset:
+        logger.info(f"Embeddings written to JSONLines file: {output_jsonl}")
+
+    # default: write to TIMDEX dataset
+    elif timdex_dataset:
         timdex_dataset.embeddings.write(_dataset_embedding_iter(embeddings))
         logger.info("Embeddings written to TIMDEX dataset.")
+
+    else:
+        logger.warning("No output destination specified for embeddings")
 
     logger.info("Embeddings creation complete.")
 
