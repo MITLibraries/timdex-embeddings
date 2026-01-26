@@ -1,0 +1,149 @@
+### A special prod-promote workflow for this special repository that needs
+### parallel builds for both GPU-enabled and non-GPU-enabled containers.
+name: Prod Container Promote
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: "us-east-1"
+  GHA_ROLE_STAGE: "timdex-embeddings-gha-stage"
+  GHA_ROLE_PROD: "timdex-embeddings-gha-prod"
+  ECR_STAGE: "timdex-embeddings-stage"
+  ECR_PROD: "timdex-embeddings-prod"
+
+# Set defaults
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prep:
+    if: github.ref == 'refs/heads/main'
+    name: Set architectures from .aws-architecture file
+    runs-on: ubuntu-latest
+    outputs:
+      gpu_arch: ${{ steps.out.outputs.gpu_arch }}
+      cpu_arch: ${{ steps.out.outputs.cpu_arch }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - id: out
+        run: |
+          GPU_ARCH=$(jq -r '.gpu // "linux/amd64"' .aws-architecture)
+          CPU_ARCH=$(jq -r '.cpu // "linux/amd64"' .aws-architecture)
+          echo "gpu_arch=$GPU_ARCH" >> $GITHUB_OUTPUT
+          echo "cpu_arch=$CPU_ARCH" >> $GITHUB_OUTPUT
+
+  promote:
+    name: Promote ${{ matrix.variant }} (for ${{ matrix.arch }}))
+    needs: prep
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: gpu
+            arch: ${{ needs.prep.outputs.gpu_arch }}
+          - variant: cpu
+            arch: ${{ needs.prep.outputs.cpu_arch }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Configure Stage AWS credentials
+        id: login-aws-stage
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_STAGE }}:role/${{ env.GHA_ROLE_STAGE }}
+
+      - name: Check Stage ${{ matrix.variant }} SHA
+        id: check_sha
+        run: |
+          if aws ecr describe-images \
+                --repository-name ${{ env.ECR_STAGE}} \
+                --image-ids imageTag=latest-${{ matrix.arch }}-${{ matrix.variant }} \
+                --query 'imageDetails[].imageTags[]' \
+                --output text | grep -q ${GITHUB_SHA::8}
+          then
+            echo "sha_match=true" >> $GITHUB_OUTPUT
+            echo "tag_sha=${GITHUB_SHA::8}-${{ matrix.arch }}-${{ matrix.variant }}" >> $GITHUB_OUTPUT
+            echo "tag_release=${{ github.event.release.tag_name }}-${{ matrix.arch }}-${{ matrix.variant }}" >> $GITHUB_OUTPUT
+            echo "### SHA Match Success for ${{ matrix.variant }}" >> $GITHUB_STEP_SUMMARY
+            echo "Continue to promoting the ${{ matrix.variant }} Stage containers to Production." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "sha_match=false" >> $GITHUB_OUTPUT
+            echo "### SHA Match Failure for ${{ matrix.variant }}" >> $GITHUB_STEP_SUMMARY
+            echo "FAILURE: Stage-Workloads ${{ matrix.variant }} SHA did not match the main branch." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Login to Stage Amazon ECR
+        id: login-ecr-stage
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Download latest-${{ matrix.arch }}-${{ matrix.variant }} from Stage
+        id: stage-download
+        if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+        env:
+          REGISTRY: ${{ steps.login-ecr-stage.outputs.registry }}
+          REPOSITORY: ${{ env.ECR_STAGE }}
+          TAG_SHA: ${{ steps.check_sha.outputs.tag_sha }}
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.REPOSITORY }}:${{ env.TAG_SHA }}
+
+      - name: Configure Prod AWS credentials
+        if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+        id: login-aws-prod
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_PROD }}:role/${{ env.GHA_ROLE_PROD }}
+
+      - name: Login to Prod Amazon ECR
+        if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+        id: login-ecr-prod
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Re-tag and push to Prod
+        id: prod-push
+        if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
+        env:
+          REGISTRY_STAGE: ${{ steps.login-ecr-stage.outputs.registry }}
+          REGISTRY_PROD: ${{ steps.login-ecr-prod.outputs.registry }}
+          REPOSITORY_STAGE: ${{ env.ECR_STAGE }}
+          REPOSITORY_PROD: ${{ env.ECR_PROD }}
+          TAG_SHA: ${{ steps.check_sha.outputs.tag_sha }}
+          TAG_RELEASE: ${{ steps.check_sha.outputs.tag_release }}
+          TAG_LATEST: latest-${{ matrix.arch }}-${{ matrix.variant }}
+        run: |
+          echo "### :whale: Promote ${{ matrix.variant }} Container to Production" >> $GITHUB_STEP_SUMMARY
+          docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${{ env.TAG_SHA }} \
+            ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_LATEST }}
+          docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${{ env.TAG_SHA }} \
+            ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_SHA }}
+          docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_LATEST }}
+          docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_SHA }}
+
+          echo "✅ Promoted ${{ matrix.variant }} container to Prod ECR with the following tags:" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.TAG_LATEST }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`${{ env.TAG_SHA }}\` (GitHub SHA)" >> $GITHUB_STEP_SUMMARY
+
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${{ env.TAG_SHA }} \
+              ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_RELEASE }}
+            docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:${{ env.TAG_RELEASE }}
+            echo "- \`${{ env.TAG_RELEASE }}\` (GitHub Release Version)" >> $GITHUB_STEP_SUMMARY
+          else
+            docker tag ${{ env.REGISTRY_STAGE }}/${{ env.REPOSITORY_STAGE }}:${{ env.TAG_SHA }} \
+              ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:workflow_dispatch_${{ matrix.variant }}
+            docker push ${{ env.REGISTRY_PROD }}/${{ env.REPOSITORY_PROD }}:workflow_dispatch_${{ matrix.variant }}
+            echo "- \`workflow_dispatch_${{ matrix.variant }}\`" >> $GITHUB_STEP_SUMMARY
+          fi
