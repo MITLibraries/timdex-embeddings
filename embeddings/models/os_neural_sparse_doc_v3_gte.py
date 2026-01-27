@@ -31,6 +31,8 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
     """
 
     MODEL_URI = "opensearch-project/opensearch-neural-sparse-encoding-doc-v3-gte"
+    OPENSEARCH_MODEL_REVISION = "1646fef40807937e8e130c66d327a26421c408d5"
+    ALIBABA_NEW_IMPL_REVISION = "40ced75c3017eb27626c9d4ea981bde21a2662f4"
 
     def __init__(self, model_path: str | Path) -> None:
         """Initialize the model.
@@ -56,7 +58,11 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             temp_path = Path(temp_dir)
 
             # download snapshot of HuggingFace model
-            snapshot_download(repo_id=self.model_uri, local_dir=temp_path)
+            snapshot_download(
+                repo_id=self.model_uri,
+                local_dir=temp_path,
+                revision=self.OPENSEARCH_MODEL_REVISION,
+            )
             logger.debug("Model download complete.")
 
             # patch local model with files from dependency model "Alibaba-NLP/new-impl"
@@ -100,6 +106,7 @@ class OSNeuralSparseDocV3GTE(BaseEmbeddingModel):
             snapshot_download(
                 repo_id="Alibaba-NLP/new-impl",
                 local_dir=str(temp_path),
+                revision=self.ALIBABA_NEW_IMPL_REVISION,
             )
 
             logger.info("Copying Alibaba code and updating config.json")

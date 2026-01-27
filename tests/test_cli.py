@@ -79,8 +79,9 @@ def test_model_required_decorator_help_flag_early_exit(runner):
     assert result.exit_code == 0
 
 
-def test_model_required_decorator_missing_parameter(runner):
+def test_model_required_decorator_missing_parameter(monkeypatch, runner):
     """Test decorator fails when --model-uri is not provided and env var is not set."""
+    monkeypatch.delenv("TE_MODEL_URI", raising=False)
     result = runner.invoke(main, ["download-model", "--model-path", "out.zip"])
 
     assert result.exit_code != 0
@@ -190,6 +191,37 @@ def test_create_embeddings_writes_to_timdex_dataset(
     assert isinstance(embedding_row.embedding_vector, np.ndarray)
 
 
+def test_create_embeddings_writes_to_timdex_dataset_by_source(
+    caplog,
+    runner,
+    dataset_with_records,
+    register_mock_model,
+):
+    caplog.set_level("DEBUG")
+
+    result = runner.invoke(
+        main,
+        [
+            "--verbose",
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--dataset-location",
+            dataset_with_records.location,
+            "--source",
+            "apples",
+            "--strategy",
+            "full_record",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    timdex_dataset = TIMDEXDataset(location=dataset_with_records.location)
+    embeddings_df = timdex_dataset.embeddings.read_dataframe(run_id="run-1")
+    assert len(embeddings_df) == 2
+
+
 def test_create_embeddings_requires_strategy(register_mock_model, runner):
     result = runner.invoke(
         main,
@@ -221,7 +253,7 @@ def test_create_embeddings_requires_dataset_location(register_mock_model, runner
         ],
     )
     assert result.exit_code != 0
-    assert "Both '--dataset-location' and '--run-id' are required" in result.output
+    assert "'--dataset-location' is required" in result.output
 
 
 def test_create_embeddings_requires_run_id(register_mock_model, runner):
@@ -238,7 +270,28 @@ def test_create_embeddings_requires_run_id(register_mock_model, runner):
         ],
     )
     assert result.exit_code != 0
-    assert "Both '--dataset-location' and '--run-id' are required" in result.output
+    assert "One of '--run-id' or '--source' is required" in result.output
+
+
+def test_create_embeddings_requires_single_read_mode(register_mock_model, runner):
+    result = runner.invoke(
+        main,
+        [
+            "create-embeddings",
+            "--model-uri",
+            "test/mock-model",
+            "--dataset-location",
+            "s3://test",
+            "--run-id",
+            "run-1",
+            "--source",
+            "apples",
+            "--strategy",
+            "full_record",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Use either '--run-id' or '--source', not both." in result.output
 
 
 def test_create_embeddings_optional_input_jsonl(register_mock_model, runner, tmp_path):

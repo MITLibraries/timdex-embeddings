@@ -73,7 +73,10 @@ def model_required(f: Callable) -> Callable:
         "--model-uri",
         envvar="TE_MODEL_URI",
         required=True,
-        help="HuggingFace model URI (e.g., 'org/model-name')",
+        help=(
+            "HuggingFace model URI (e.g., 'org/model-name'). "
+            "Defaults to env var TE_MODEL_URI if set."
+        ),
     )
     @click.option(
         "--model-path",
@@ -82,7 +85,7 @@ def model_required(f: Callable) -> Callable:
         type=click.Path(path_type=Path),
         help=(
             "Path where the model will be downloaded to and loaded from, "
-            "e.g. '/path/to/model'."
+            "e.g. '/path/to/model'. Defaults to env var TE_MODEL_PATH if set."
         ),
     )
     @functools.wraps(f)
@@ -171,7 +174,15 @@ def test_model_load(ctx: click.Context) -> None:
     "--run-id",
     required=False,
     type=str,
-    help="TIMDEX ETL run id.",
+    help="TIMDEX ETL run id. Mutually exclusive with --source.",
+)
+@click.option(
+    "--source",
+    required=False,
+    type=str,
+    help=(
+        "Retrieve current records from a TIMDEX source. Mutually exclusive with --run-id."
+    ),
 )
 @click.option(
     "--run-record-offset",
@@ -220,17 +231,21 @@ def test_model_load(ctx: click.Context) -> None:
     type=int,
     default=100,
     envvar="EMBEDDING_BATCH_SIZE",
-    help="Number of embeddings to process per batch.",
+    help=(
+        "Number of embeddings to process per batch. Defaults to env var "
+        "EMBEDDING_BATCH_SIZE if set."
+    ),
 )
 def create_embeddings(
     ctx: click.Context,
-    dataset_location: str,
-    run_id: str,
+    dataset_location: str | None,
+    run_id: str | None,
+    source: str | None,
     run_record_offset: int,
-    record_limit: int,
-    input_jsonl: str,
+    record_limit: int | None,
+    input_jsonl: str | None,
     strategy: list[str],
-    output_jsonl: str,
+    output_jsonl: str | None,
     batch_size: int,
 ) -> None:
     """Create embeddings for TIMDEX records."""
@@ -238,36 +253,63 @@ def create_embeddings(
     model.load()
     timdex_dataset: TIMDEXDataset | None = None
 
-    # read input records from TIMDEX dataset (default) or a JSONLines file
+    # JSONLines input (primarily for testing)
     if input_jsonl:
         with (
             smart_open.open(input_jsonl, "r") as file_obj,  # type: ignore[no-untyped-call]
             jsonlines.Reader(file_obj) as reader,
         ):
             timdex_records = iter(list(reader))
+
+    # default: read from TIMDEX dataset
     else:
-        if not dataset_location or not run_id:
+        if not dataset_location:
             raise click.UsageError(
-                "Both '--dataset-location' and '--run-id' are required arguments "
-                "when reading input records from the TIMDEX dataset."
+                "'--dataset-location' is required when reading input records from "
+                "the TIMDEX dataset."
             )
 
-        # init TIMDEXDataset
+        if run_id and source:
+            raise click.UsageError("Use either '--run-id' or '--source', not both.")
+        if not run_id and not source:
+            raise click.UsageError(
+                "One of '--run-id' or '--source' is required when reading "
+                "input records from the TIMDEX dataset."
+            )
+
         timdex_dataset = TIMDEXDataset(dataset_location)
 
-        # query TIMDEX dataset for an iterator of records
-        timdex_records = timdex_dataset.read_dicts_iter(
-            columns=[
-                "timdex_record_id",
-                "run_id",
-                "run_record_offset",
-                "transformed_record",
-            ],
-            run_id=run_id,
-            where=f"""run_record_offset >= {run_record_offset}""",
-            limit=record_limit,
-            action="index",
-        )
+        # get ETL run records
+        if run_id:
+            timdex_records = timdex_dataset.read_dicts_iter(
+                table="records",
+                columns=[
+                    "timdex_record_id",
+                    "run_id",
+                    "run_record_offset",
+                    "transformed_record",
+                ],
+                run_id=run_id,
+                where=f"run_record_offset >= {run_record_offset}",
+                limit=record_limit,
+                action="index",
+            )
+
+        # get current records for a source
+        else:
+            timdex_records = timdex_dataset.read_dicts_iter(
+                table="current_records",
+                columns=[
+                    "timdex_record_id",
+                    "run_id",
+                    "run_record_offset",
+                    "transformed_record",
+                ],
+                source=source,
+                where=f"run_record_offset >= {run_record_offset}",
+                limit=record_limit,
+                action="index",
+            )
 
     # create an iterator of EmbeddingInputs applying all requested strategies
     embedding_inputs = create_embedding_inputs(timdex_records, list(strategy))
@@ -275,7 +317,7 @@ def create_embeddings(
     # create embeddings via the embedding model
     embeddings = model.create_embeddings(embedding_inputs, batch_size=batch_size)
 
-    # write embeddings to TIMDEX dataset (default) or to a JSONLines file
+    # JSONLines output (primarily for testing)
     if output_jsonl:
         with (
             smart_open.open(output_jsonl, "w") as s3_file,  # type: ignore[no-untyped-call]
@@ -286,12 +328,15 @@ def create_embeddings(
         ):
             for embedding in embeddings:
                 writer.write(embedding.to_dict())
-    else:
-        if not timdex_dataset:
-            # if input_jsonl, init TIMDEXDataset
-            timdex_dataset = TIMDEXDataset(dataset_location)
+        logger.info(f"Embeddings written to JSONLines file: {output_jsonl}")
+
+    # default: write to TIMDEX dataset
+    elif timdex_dataset:
         timdex_dataset.embeddings.write(_dataset_embedding_iter(embeddings))
         logger.info("Embeddings written to TIMDEX dataset.")
+
+    else:
+        logger.warning("No output destination specified for embeddings")
 
     logger.info("Embeddings creation complete.")
 
