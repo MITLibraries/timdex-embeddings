@@ -32,7 +32,7 @@ dev = [
 
 # dependency group for local virtual environment development work
 local = [
-    "torch>=2.6,<2.7",
+    "torch>=2.6,<2.11",
 ]
 
 # dependency group for arm64 / CPU AWS Deep Learning Container (DLC) base image
