@@ -36,6 +36,8 @@ There are three GitHub Actions workflows for automated build+deploy to AWS. Thes
 
 ### Dev Workflow
 
+**Note**: This workflow runs when a PR is opened or when an open PR is updated, _unless that PR is triggered by `depdendabot`_.
+
 1. There is an initial job that runs and parses the `.aws-architecture` file and generates outputs that will drive the next phase.
 1. The second phase of the workflow is a matrix strategy that will kick off two runners, one for each build. The runner is picked to match the CPU architecture of the requested build. That is, if the `gpu` key in the `.aws-architecture` file specifies `linux/amd64`, then the runner for the `gpu` container will be an `amd64`-based runner. If the `cpu` key in the `.aws-architecture` file specifies `linux/arm64` then the `cpu` container will be an `arm64`-based runner. This way, when Docker runs, it is running on the same architecture as the container it is trying to build.
 
@@ -45,11 +47,8 @@ The Stage workflow is the same as the Dev workflow, only the trigger is differen
 
 ### Prod Workflow
 
-Similar to our shared workflows, the Prod workflow will 
+Similar to our shared workflows, the Prod workflow will run on a tagged release on the `main` branch. Different from our shared workflows, the workflow will first run a job to capture the CPU architecture information from the `.aws-architecture` file so that the subsequent job can find the correct tags on the containers in the Stage ECR Reository to push over to Prod.
 
-1. Verify that the SHAs match between stage & prod
-1. Download the images from the Stage ECR
-1. Re-tag the images for Prod
-1. Upload the images to Prod ECR
+**Job 1**: Process the `.aws-architecture` file to capture the CPU architectures for the GPU containers and the CPU containers.
 
-There is no need for a matrix or different runners since we aren't building anything.
+**Job 2**: Use the output of **Job 1** to generate a matrix to run parallel jobs to pull containers from Stage, re-tag them for Prod, and then push them to Prod. Just like our shared workflows, the very first step is to check whether the commit SHA on `main` (where the tagged release is being applied) matches the commit SHA that was tagged onto the container in the Stage-Workloads ECR Repository.
