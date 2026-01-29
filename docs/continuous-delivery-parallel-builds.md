@@ -36,6 +36,8 @@ There are three GitHub Actions workflows for automated build+deploy to AWS. Thes
 
 ### Dev Workflow
 
+**Note**: This workflow runs when a PR is opened or when an open PR is updated, _unless that PR is triggered by `depdendabot`_.
+
 1. There is an initial job that runs and parses the `.aws-architecture` file and generates outputs that will drive the next phase.
 1. The second phase of the workflow is a matrix strategy that will kick off two runners, one for each build. The runner is picked to match the CPU architecture of the requested build. That is, if the `gpu` key in the `.aws-architecture` file specifies `linux/amd64`, then the runner for the `gpu` container will be an `amd64`-based runner. If the `cpu` key in the `.aws-architecture` file specifies `linux/arm64` then the `cpu` container will be an `arm64`-based runner. This way, when Docker runs, it is running on the same architecture as the container it is trying to build.
 

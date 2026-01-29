@@ -27,7 +27,9 @@ env:
   REPOSITORY: "timdex-embeddings-dev"
 
 jobs:
-  choose-runners:
+  choose-runners:    
+    # This line adds a check for the user which is requesting the PR. As long as its not dependabot, we go ahead and run it. 
+    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
     name: Determine Runner architecture from .aws-architecture file
     runs-on: ubuntu-latest
     outputs:
@@ -43,7 +45,9 @@ jobs:
           echo "gpu_arch=$GPU_ARCH" >> $GITHUB_OUTPUT
           echo "cpu_arch=$CPU_ARCH" >> $GITHUB_OUTPUT
 
-  build:
+  build:   
+    # This line adds a check for the user which is requesting the PR. As long as its not dependabot, we go ahead and run it. 
+    if: ${{ github.triggering_actor != 'dependabot[bot]' }}
     name: Build ${{ matrix.variant }} (${{ matrix.arch }})
     needs: choose-runners
     strategy:
