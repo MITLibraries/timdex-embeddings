@@ -15,7 +15,7 @@ dependencies = [
     "sentry-sdk>=2.34.1",
     "smart-open[s3]>=7.4.4",
     "timdex-dataset-api",
-    "transformers>=4.57.6,<5.0.0",
+    "transformers>=4.57.6,<6.0.0",
 ]
 
 [dependency-groups]
