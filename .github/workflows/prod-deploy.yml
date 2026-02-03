@@ -24,7 +24,7 @@ defaults:
 
 jobs:
   prep:
-    if: github.ref == 'refs/heads/main'
+    if: github.event.release.target_commitish == 'main'
     name: Set architectures from .aws-architecture file
     runs-on: ubuntu-latest
     outputs:
