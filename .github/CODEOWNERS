@@ -12,6 +12,8 @@
 # the format @org/team-name. Teams must have explicit write access to the
 # repository.
 * @mitlibraries/dataeng
+/.github/* @mitlibraries/infraeng
+/.github/ci.yml @mitlibraries/dataeng
 
 # We set the senior engineer in the team as the owner of the CODEOWNERS file as
 # a layer of protection for unauthorized changes.
