@@ -59,7 +59,7 @@ jobs:
 
       - name: Configure Stage AWS credentials
         id: login-aws-stage
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_STAGE }}:role/${{ env.GHA_ROLE_STAGE }}
@@ -102,7 +102,7 @@ jobs:
       - name: Configure Prod AWS credentials
         if: ${{ steps.check_sha.outputs.sha_match == 'true' }}
         id: login-aws-prod
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCT_PROD }}:role/${{ env.GHA_ROLE_PROD }}
